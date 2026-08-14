@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Check } from 'lucide-react';
+import { optimizeImageFile } from '../../lib/imageOptimizer';
 
 interface ImageDropzoneProps {
   onImagesSelected: (base64List: string[]) => void;
@@ -37,7 +38,7 @@ export const ImageDropzone: React.FC<ImageDropzoneProps> = ({
     }
   }, [currentValue]);
 
-  const processFiles = (files: FileList | File[]) => {
+  const processFiles = async (files: FileList | File[]) => {
     const validFiles = Array.from(files).filter((file) =>
       file.type.startsWith('image/')
     );
@@ -47,31 +48,19 @@ export const ImageDropzone: React.FC<ImageDropzoneProps> = ({
       return;
     }
 
-    const filePromises = validFiles.slice(0, maxFiles).map((file) => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            resolve(e.target.result as string);
-          } else {
-            reject('Erro ao ler imagem');
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+    try {
+      const optimizedPromises = validFiles.slice(0, maxFiles).map((file) => {
+        return optimizeImageFile(file, 1400, 0.82);
       });
-    });
 
-    Promise.all(filePromises)
-      .then((base64Results) => {
-        if (!multiple && base64Results.length > 0) {
-          setPreview(base64Results[0]);
-        }
-        onImagesSelected(base64Results);
-      })
-      .catch((err) => {
-        console.error('Erro ao carregar arquivos:', err);
-      });
+      const base64Results = await Promise.all(optimizedPromises);
+      if (!multiple && base64Results.length > 0) {
+        setPreview(base64Results[0]);
+      }
+      onImagesSelected(base64Results);
+    } catch (err) {
+      console.error('Erro ao processar imagem:', err);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {

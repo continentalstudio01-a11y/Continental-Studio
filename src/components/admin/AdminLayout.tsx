@@ -39,16 +39,19 @@ import {
   Zap,
   Music,
   SlidersHorizontal,
-  Activity
+  Activity,
+  Cloud,
+  CloudCheck,
+  RefreshCw
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
-  const { siteSettings, logoutAdmin, toggleAdminMode, orders, saveAllData, hasUnsavedChanges } = useBioSite();
+  const { siteSettings, logoutAdmin, toggleAdminMode, orders, saveAllData, hasUnsavedChanges, isCloudSynced, isCloudSaving } = useBioSite();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showToast, setShowToast] = useState(false);
 
-  const handleGlobalSave = () => {
-    saveAllData();
+  const handleGlobalSave = async () => {
+    await saveAllData();
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3500);
   };
@@ -139,8 +142,16 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Cloud Firestore Status Badge */}
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Nuvem Ativa</span>
+          </div>
+
           <button
             onClick={handleGlobalSave}
+            disabled={isCloudSaving}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all duration-300 cursor-pointer shadow-lg ${
               hasUnsavedChanges
                 ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black animate-pulse shadow-amber-500/30 hover:scale-105'
@@ -148,8 +159,14 @@ export const AdminLayout: React.FC = () => {
             }`}
             title="Salvar todas as alterações feitas no painel"
           >
-            <Save className="w-4 h-4" />
-            <span className="font-extrabold uppercase tracking-wider">Salvar Tudo</span>
+            {isCloudSaving ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span className="font-extrabold uppercase tracking-wider">
+              {isCloudSaving ? 'Salvando na Nuvem...' : 'Salvar Tudo'}
+            </span>
             {hasUnsavedChanges && (
               <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />
             )}

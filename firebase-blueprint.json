@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global website configuration, contact, pixels, and branding",
+      "type": "object",
+      "properties": {
+        "brandName": { "type": "string" },
+        "bioTagline": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "instagramUser": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      }
+    },
+    "Package": {
+      "title": "Package",
+      "description": "Services and visual identity packages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "badge": { "type": "string" }
+      }
+    },
+    "PortfolioItem": {
+      "title": "PortfolioItem",
+      "description": "Visual work and projects",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders and tracking status",
+      "type": "object",
+      "properties": {
+        "trackingCode": { "type": "string" },
+        "clientName": { "type": "string" },
+        "packageName": { "type": "string" },
+        "status": { "type": "string" },
+        "price": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "biosite_data/main_settings": {
+      "schema": "SiteSettings",
+      "description": "Single document holding full persistent site settings and synced content"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Order records for real-time tracking"
+    }
+  }
+}

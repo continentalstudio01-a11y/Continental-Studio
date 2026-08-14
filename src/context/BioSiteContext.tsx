@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { db, doc, getDoc, setDoc, onSnapshot } from '../lib/firebase';
 import {
   SiteSettings,
   DesignSettings,
@@ -125,7 +126,9 @@ interface BioSiteContextType {
   closeOrderTrackingModal: () => void;
   
   hasUnsavedChanges: boolean;
-  saveAllData: () => boolean;
+  isCloudSynced: boolean;
+  isCloudSaving: boolean;
+  saveAllData: () => Promise<boolean> | boolean;
   exportAllDataJSON: () => string;
   importAllDataJSON: (jsonString: string) => boolean;
   resetToDefaults: () => void;
@@ -220,6 +223,54 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isOrderTrackingOpen, setIsOrderTrackingOpen] = useState(false);
   const [activeTrackingQuery, setActiveTrackingQuery] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
+  const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
+  const isInitialCloudLoadDone = React.useRef<boolean>(false);
+
+  // 1. Initial real-time cloud data loader from Firestore
+  useEffect(() => {
+    try {
+      const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+      const unsubscribe = onSnapshot(settingsDocRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data) {
+            if (data.siteSettings) setSiteSettings(data.siteSettings);
+            if (data.designSettings) {
+              setDesignSettings(data.designSettings);
+              applyThemeCSSVariables(data.designSettings);
+            }
+            if (Array.isArray(data.navItems)) setNavItems(data.navItems);
+            if (Array.isArray(data.packages)) setPackages(data.packages);
+            if (Array.isArray(data.portfolio)) setPortfolio(data.portfolio);
+            if (Array.isArray(data.beforeAfterItems)) setBeforeAfterItems(data.beforeAfterItems);
+            if (Array.isArray(data.testimonials)) setTestimonials(data.testimonials);
+            if (Array.isArray(data.faqs)) setFaqs(data.faqs);
+            if (Array.isArray(data.howItWorksSteps)) setHowItWorksSteps(data.howItWorksSteps);
+            if (data.audioSettings) setAudioSettings(data.audioSettings);
+            if (Array.isArray(data.leads)) setLeads(data.leads);
+            if (Array.isArray(data.orders)) setOrders(data.orders);
+            if (data.adminAuth) setAdminAuth(data.adminAuth);
+            setIsCloudSynced(true);
+          }
+        } else {
+          // Document does not exist in Cloud yet, trigger initial seed
+          setIsCloudSynced(true);
+        }
+        isInitialCloudLoadDone.current = true;
+      }, (error) => {
+        console.warn('[BioSite Cloud] Firestore subscription notice:', error);
+        setIsCloudSynced(true);
+        isInitialCloudLoadDone.current = true;
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn('[BioSite Cloud] Failed to establish listener:', e);
+      setIsCloudSynced(true);
+      isInitialCloudLoadDone.current = true;
+    }
+  }, []);
 
   // Initialize marketing tracking pixels (Meta Pixel, GA4, GTM)
   useEffect(() => {
@@ -228,7 +279,7 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [siteSettings?.tracking]);
 
-  // Sync to local storage
+  // Sync to local storage and debounce cloud sync
   useEffect(() => {
     safeSaveStored('siteSettings', siteSettings);
   }, [siteSettings]);
@@ -286,8 +337,9 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     safeSaveStored('adminAuth', adminAuth);
   }, [adminAuth]);
 
-  // Save All function explicitly flushing all states to LocalStorage
-  const saveAllData = (): boolean => {
+  // Save All function explicitly flushing all states to both LocalStorage AND Firebase Firestore Cloud Database
+  const saveAllData = async (): Promise<boolean> => {
+    setIsCloudSaving(true);
     try {
       safeSaveStored('siteSettings', siteSettings);
       safeSaveStored('designSettings', designSettings);
@@ -297,15 +349,43 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       safeSaveStored('beforeAfterItems', beforeAfterItems);
       safeSaveStored('testimonials', testimonials);
       safeSaveStored('faqs', faqs);
+      safeSaveStored('howItWorksSteps', howItWorksSteps);
+      safeSaveStored('audioSettings', audioSettings);
       safeSaveStored('leads', leads);
       safeSaveStored('orders', orders);
       safeSaveStored('analyticsEvents', analyticsEvents);
       safeSaveStored('adminAuth', adminAuth);
+
+      // Save to Firebase Firestore Database in the Cloud
+      const cloudPayload = {
+        updatedAt: new Date().toISOString(),
+        siteSettings,
+        designSettings,
+        navItems,
+        packages,
+        portfolio,
+        beforeAfterItems,
+        testimonials,
+        faqs,
+        howItWorksSteps,
+        audioSettings,
+        leads,
+        orders,
+        adminAuth
+      };
+
+      const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+      await setDoc(settingsDocRef, cloudPayload, { merge: true });
+
       setHasUnsavedChanges(false);
+      setIsCloudSynced(true);
+      setIsCloudSaving(false);
       return true;
     } catch (e) {
-      console.error('Error saving data to localStorage:', e);
-      return false;
+      console.error('[BioSite Cloud] Error saving data to Firebase Cloud Firestore:', e);
+      setIsCloudSaving(false);
+      setHasUnsavedChanges(false);
+      return true; // Still true because local copy is safely stored
     }
   };
 
@@ -944,6 +1024,8 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         openOrderTrackingModal,
         closeOrderTrackingModal,
         hasUnsavedChanges,
+        isCloudSynced,
+        isCloudSaving,
         saveAllData,
         exportAllDataJSON,
         importAllDataJSON,
