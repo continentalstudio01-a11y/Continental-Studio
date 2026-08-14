@@ -17,6 +17,50 @@ async function startServer() {
     res.json({ status: "ok", app: "Continental Studio BioSite", version: "1.0.0" });
   });
 
+  // Persistent Server-Side Storage for multi-device & multi-browser sync
+  const DATA_DIR = path.join(process.cwd(), "data");
+  const DATA_FILE = path.join(DATA_DIR, "biosite_data.json");
+
+  // Ensure data directory exists
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {
+      console.warn("Failed to create data dir:", e);
+    }
+  }
+
+  // Get current synchronized site data
+  app.get("/api/site-data", (_req, res) => {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        const raw = fs.readFileSync(DATA_FILE, "utf-8");
+        const parsed = JSON.parse(raw);
+        return res.json({ success: true, data: parsed });
+      }
+      return res.json({ success: true, data: null });
+    } catch (err: any) {
+      console.error("[Site Data GET Error]:", err);
+      return res.status(500).json({ error: "Failed to read data file" });
+    }
+  });
+
+  // Save synchronized site data
+  app.post("/api/site-data", (req, res) => {
+    try {
+      const payload = req.body;
+      if (!payload || typeof payload !== "object") {
+        return res.status(400).json({ error: "Invalid payload" });
+      }
+      fs.writeFileSync(DATA_FILE, JSON.stringify(payload, null, 2), "utf-8");
+      console.log(`[Site Data] Successfully saved ${Object.keys(payload).length} state keys.`);
+      return res.json({ success: true, savedAt: new Date().toISOString() });
+    } catch (err: any) {
+      console.error("[Site Data POST Error]:", err);
+      return res.status(500).json({ error: "Failed to write data file" });
+    }
+  });
+
   // In-memory audio store for uploads and AI generated tracks
   const audioStore = new Map<string, { buffer: Buffer; mimeType: string; filename: string }>();
 

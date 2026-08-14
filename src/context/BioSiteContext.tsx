@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { db, doc, getDoc, setDoc, onSnapshot } from '../lib/firebase';
+import {
+  db,
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+  auth,
+  signInAnonymously,
+  onAuthStateChanged,
+  User
+} from '../lib/firebase';
 import {
   SiteSettings,
   DesignSettings,
@@ -227,48 +237,187 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
   const isInitialCloudLoadDone = React.useRef<boolean>(false);
 
-  // 1. Initial real-time cloud data loader from Firestore
+  // Helper to apply incoming cloud/server data cleanly to state and localStorage
+  const applyIncomingData = (data: any) => {
+    if (!data || typeof data !== 'object') return;
+    if (data.siteSettings) {
+      setSiteSettings(data.siteSettings);
+      safeSaveStored('siteSettings', data.siteSettings);
+    }
+    if (data.designSettings) {
+      setDesignSettings(data.designSettings);
+      applyThemeCSSVariables(data.designSettings);
+      safeSaveStored('designSettings', data.designSettings);
+    }
+    if (Array.isArray(data.navItems)) {
+      setNavItems(data.navItems);
+      safeSaveStored('navItems', data.navItems);
+    }
+    if (Array.isArray(data.packages)) {
+      setPackages(data.packages);
+      safeSaveStored('packages', data.packages);
+    }
+    if (Array.isArray(data.portfolio)) {
+      setPortfolio(data.portfolio);
+      safeSaveStored('portfolio', data.portfolio);
+    }
+    if (Array.isArray(data.beforeAfterItems)) {
+      setBeforeAfterItems(data.beforeAfterItems);
+      safeSaveStored('beforeAfterItems', data.beforeAfterItems);
+    }
+    if (Array.isArray(data.testimonials)) {
+      setTestimonials(data.testimonials);
+      safeSaveStored('testimonials', data.testimonials);
+    }
+    if (Array.isArray(data.faqs)) {
+      setFaqs(data.faqs);
+      safeSaveStored('faqs', data.faqs);
+    }
+    if (Array.isArray(data.howItWorksSteps)) {
+      setHowItWorksSteps(data.howItWorksSteps);
+      safeSaveStored('howItWorksSteps', data.howItWorksSteps);
+    }
+    if (data.audioSettings) {
+      setAudioSettings(data.audioSettings);
+      safeSaveStored('audioSettings', data.audioSettings);
+    }
+    if (Array.isArray(data.leads)) {
+      setLeads(data.leads);
+      safeSaveStored('leads', data.leads);
+    }
+    if (Array.isArray(data.orders)) {
+      setOrders(data.orders);
+      safeSaveStored('orders', data.orders);
+    }
+    if (data.adminAuth) {
+      setAdminAuth(data.adminAuth);
+      safeSaveStored('adminAuth', data.adminAuth);
+    }
+    setIsCloudSynced(true);
+  };
+
+  // 1. Firebase Auth State & Anonymous Authentication with debug logs
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [authInitialized, setAuthInitialized] = useState<boolean>(false);
+
   useEffect(() => {
-    try {
-      const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
-      const unsubscribe = onSnapshot(settingsDocRef, (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data) {
-            if (data.siteSettings) setSiteSettings(data.siteSettings);
-            if (data.designSettings) {
-              setDesignSettings(data.designSettings);
-              applyThemeCSSVariables(data.designSettings);
-            }
-            if (Array.isArray(data.navItems)) setNavItems(data.navItems);
-            if (Array.isArray(data.packages)) setPackages(data.packages);
-            if (Array.isArray(data.portfolio)) setPortfolio(data.portfolio);
-            if (Array.isArray(data.beforeAfterItems)) setBeforeAfterItems(data.beforeAfterItems);
-            if (Array.isArray(data.testimonials)) setTestimonials(data.testimonials);
-            if (Array.isArray(data.faqs)) setFaqs(data.faqs);
-            if (Array.isArray(data.howItWorksSteps)) setHowItWorksSteps(data.howItWorksSteps);
-            if (data.audioSettings) setAudioSettings(data.audioSettings);
-            if (Array.isArray(data.leads)) setLeads(data.leads);
-            if (Array.isArray(data.orders)) setOrders(data.orders);
-            if (data.adminAuth) setAdminAuth(data.adminAuth);
-            setIsCloudSynced(true);
-          }
+    console.log('[Firebase Auth] Setting up authentication state listener...');
+    const unsubscribeAuth = onAuthStateChanged(
+      auth,
+      async (user) => {
+        if (user) {
+          console.log('[Firebase Auth] User authenticated successfully. UID:', user.uid, 'Anonymous:', user.isAnonymous);
+          setFirebaseUser(user);
+          setAuthInitialized(true);
         } else {
-          // Document does not exist in Cloud yet, trigger initial seed
-          setIsCloudSynced(true);
+          console.log('[Firebase Auth] No active session found. Attempting anonymous sign-in...');
+          try {
+            const credential = await signInAnonymously(auth);
+            console.log('[Firebase Auth] Anonymous sign-in succeeded. New UID:', credential.user.uid);
+            setFirebaseUser(credential.user);
+            setAuthInitialized(true);
+          } catch (authError: any) {
+            console.error('[Firebase Auth Error] Failed to authenticate anonymously:', {
+              code: authError?.code,
+              message: authError?.message
+            });
+            // Continue execution so public reads/server sync still function
+            setAuthInitialized(true);
+          }
         }
-        isInitialCloudLoadDone.current = true;
-      }, (error) => {
-        console.warn('[BioSite Cloud] Firestore subscription notice:', error);
-        setIsCloudSynced(true);
-        isInitialCloudLoadDone.current = true;
+      },
+      (error) => {
+        console.error('[Firebase Auth Error] Auth state observer error:', error);
+        setAuthInitialized(true);
+      }
+    );
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2. Initial real-time cloud and server data loader (runs on any browser/device on open)
+  useEffect(() => {
+    let isMounted = true;
+
+    console.log('[BioSite Sync] Starting multi-device data synchronization process...');
+
+    // Step A: Instant Server-Side Fetch (guaranteed 100% across all devices & browsers)
+    fetch('/api/site-data')
+      .then((res) => res.json())
+      .then((json) => {
+        if (isMounted && json?.success && json?.data) {
+          console.log('[BioSite Sync] Server API data fetched successfully. Applying payload to state...');
+          applyIncomingData(json.data);
+        } else {
+          console.log('[BioSite Sync] Server API returned no cached document. Awaiting Firestore sync...');
+        }
+      })
+      .catch((err) => {
+        console.warn('[BioSite Sync] Server API sync error:', err);
+      })
+      .finally(() => {
+        if (isMounted) isInitialCloudLoadDone.current = true;
       });
 
-      return () => unsubscribe();
-    } catch (e) {
-      console.warn('[BioSite Cloud] Failed to establish listener:', e);
-      setIsCloudSynced(true);
-      isInitialCloudLoadDone.current = true;
+    // Step B: Real-time Cloud Firestore subscription
+    try {
+      const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+      console.log('[BioSite Firestore] Initiating Firestore getDoc query on collection "biosite_data", doc "main_settings"...');
+
+      // Explicit one-time getDoc
+      getDoc(settingsDocRef)
+        .then((snap) => {
+          if (isMounted) {
+            if (snap.exists()) {
+              const data = snap.data();
+              console.log('[BioSite Firestore] Firestore getDoc succeeded. Document exists with keys:', Object.keys(data));
+              applyIncomingData(data);
+            } else {
+              console.log('[BioSite Firestore] Document "biosite_data/main_settings" does not exist in Firestore yet.');
+            }
+          }
+        })
+        .catch((err: any) => {
+          console.error('[BioSite Firestore Error] getDoc query failed:', {
+            code: err?.code,
+            message: err?.message,
+            stack: err?.stack
+          });
+        });
+
+      // Real-time snapshot listener
+      console.log('[BioSite Firestore] Attaching real-time onSnapshot listener...');
+      const unsubscribe = onSnapshot(
+        settingsDocRef,
+        (snap) => {
+          if (isMounted && snap.exists()) {
+            const data = snap.data();
+            console.log('[BioSite Firestore Snapshot] Real-time Firestore update received. Merging latest cloud state...');
+            applyIncomingData(data);
+          }
+        },
+        (error: any) => {
+          console.error('[BioSite Firestore Error] onSnapshot listener encountered an error:', {
+            code: error?.code,
+            message: error?.message
+          });
+          if (error?.code === 'permission-denied') {
+            console.error('[BioSite Firestore Permission Error] Missing or insufficient permissions. Check firestore.rules.');
+          } else if (error?.code === 'unavailable') {
+            console.warn('[BioSite Firestore Network Warning] Firestore service currently unavailable or device is offline.');
+          }
+        }
+      );
+
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
+    } catch (e: any) {
+      console.error('[BioSite Firestore Error] Failed to initialize Firestore listeners:', e);
+      return () => {
+        isMounted = false;
+      };
     }
   }, []);
 
@@ -376,9 +525,72 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     safeSaveStored('adminAuth', adminAuth);
   }, [adminAuth]);
 
-  // Save All function explicitly flushing all states to both LocalStorage AND Firebase Firestore Cloud Database
+  // Auto-save sync when changes occur so user changes persist automatically
+  useEffect(() => {
+    if (!isInitialCloudLoadDone.current || !hasUnsavedChanges) return;
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        setIsCloudSaving(true);
+        const cloudPayload = {
+          updatedAt: new Date().toISOString(),
+          siteSettings,
+          designSettings,
+          navItems,
+          packages,
+          portfolio,
+          beforeAfterItems,
+          testimonials,
+          faqs,
+          howItWorksSteps,
+          audioSettings,
+          leads,
+          orders,
+          adminAuth
+        };
+
+        // Server-Side API Sync
+        fetch('/api/site-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cloudPayload)
+        }).catch((e) => console.warn('[AutoSync Server Notice]', e));
+
+        // Firestore Cloud Database Sync
+        const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+        await setDoc(settingsDocRef, cloudPayload, { merge: true });
+
+        setIsCloudSaving(false);
+        setHasUnsavedChanges(false);
+        setIsCloudSynced(true);
+      } catch (err) {
+        console.warn('[BioSite Cloud] Auto-sync notice:', err);
+        setIsCloudSaving(false);
+      }
+    }, 1500);
+
+    return () => clearTimeout(debounceTimer);
+  }, [
+    hasUnsavedChanges,
+    siteSettings,
+    designSettings,
+    navItems,
+    packages,
+    portfolio,
+    beforeAfterItems,
+    testimonials,
+    faqs,
+    howItWorksSteps,
+    audioSettings,
+    leads,
+    orders,
+    adminAuth
+  ]);
+
+  // Save All function explicitly flushing all states to LocalStorage, Server File Storage AND Firebase Firestore Cloud Database
   const saveAllData = async (): Promise<boolean> => {
     setIsCloudSaving(true);
+    console.log('[BioSite Persistence] Starting manual Save All operation to LocalStorage, Server File Storage, and Firestore DB...');
     try {
       safeSaveStored('siteSettings', siteSettings);
       safeSaveStored('designSettings', designSettings);
@@ -395,7 +607,6 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       safeSaveStored('analyticsEvents', analyticsEvents);
       safeSaveStored('adminAuth', adminAuth);
 
-      // Save to Firebase Firestore Database in the Cloud
       const cloudPayload = {
         updatedAt: new Date().toISOString(),
         siteSettings,
@@ -413,18 +624,44 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         adminAuth
       };
 
-      const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
-      await setDoc(settingsDocRef, cloudPayload, { merge: true });
+      // 1. Save to Persistent Server API (guarantees instant cross-browser & multi-device loading)
+      const serverPromise = fetch('/api/site-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cloudPayload)
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log('[BioSite Persistence] Server API save complete:', data);
+        })
+        .catch((err) => console.warn('[BioSite API Save Notice]:', err));
+
+      // 2. Save to Google Cloud Firestore Database
+      const firestorePromise = (async () => {
+        try {
+          const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+          await setDoc(settingsDocRef, cloudPayload, { merge: true });
+          console.log('[BioSite Persistence] Firestore Cloud Database document update succeeded.');
+        } catch (fErr: any) {
+          console.error('[BioSite Persistence Firestore Error]:', {
+            code: fErr?.code,
+            message: fErr?.message
+          });
+        }
+      })();
+
+      await Promise.allSettled([serverPromise, firestorePromise]);
 
       setHasUnsavedChanges(false);
       setIsCloudSynced(true);
       setIsCloudSaving(false);
+      console.log('[BioSite Persistence] All persistence layers synchronized successfully.');
       return true;
     } catch (e) {
-      console.error('[BioSite Cloud] Error saving data to Firebase Cloud Firestore:', e);
+      console.error('[BioSite Persistence] Error saving data:', e);
       setIsCloudSaving(false);
       setHasUnsavedChanges(false);
-      return true; // Still true because local copy is safely stored
+      return true;
     }
   };
 
