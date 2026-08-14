@@ -75,7 +75,7 @@ export const AdminLayout: React.FC = () => {
     { id: 'orders', label: 'Pedidos & Leads', icon: ShoppingBag, badge: pendingOrdersCount },
     { id: 'pixels', label: 'Pixel & Anúncios (Meta/GA)', icon: Activity },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'settings', label: 'Configurações', icon: Settings }
+    { id: 'settings', label: 'Favicon & Configurações', icon: Settings }
   ];
 
   const renderActiveTab = () => {

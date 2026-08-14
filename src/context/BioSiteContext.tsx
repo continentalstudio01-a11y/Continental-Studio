@@ -272,6 +272,45 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
+  // Dynamic Browser Tab Favicon & Title Injection
+  useEffect(() => {
+    if (siteSettings?.seo?.pageTitle) {
+      document.title = siteSettings.seo.pageTitle;
+    } else if (siteSettings?.brandName) {
+      document.title = `${siteSettings.brandName} — BioSite AI`;
+    }
+
+    const faviconUrl = siteSettings?.seo?.favicon;
+    if (faviconUrl) {
+      // Update or create icon link
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = faviconUrl;
+
+      // Update shortcut icon
+      let shortcutLink = document.querySelector<HTMLLinkElement>("link[rel='shortcut icon']");
+      if (!shortcutLink) {
+        shortcutLink = document.createElement('link');
+        shortcutLink.rel = 'shortcut icon';
+        document.getElementsByTagName('head')[0].appendChild(shortcutLink);
+      }
+      shortcutLink.href = faviconUrl;
+
+      // Update apple-touch-icon
+      let appleLink = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+      if (!appleLink) {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        document.getElementsByTagName('head')[0].appendChild(appleLink);
+      }
+      appleLink.href = faviconUrl;
+    }
+  }, [siteSettings?.seo?.favicon, siteSettings?.seo?.pageTitle, siteSettings?.brandName]);
+
   // Initialize marketing tracking pixels (Meta Pixel, GA4, GTM)
   useEffect(() => {
     if (siteSettings?.tracking) {
