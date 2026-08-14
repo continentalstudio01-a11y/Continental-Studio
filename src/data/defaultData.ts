@@ -57,7 +57,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#C9A45C',
     secondary: '#111114',
     background: '#08080A',
+    surface: '#121216',
     text: '#F5F2EA',
+    mutedText: '#9CA3AF',
     accent: '#E0BB70'
   },
   {
@@ -66,7 +68,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#4F8CFF',
     secondary: '#101522',
     background: '#070A10',
+    surface: '#0E1320',
     text: '#F4F7FF',
+    mutedText: '#94A3B8',
     accent: '#70A3FF'
   },
   {
@@ -75,7 +79,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#42D392',
     secondary: '#101714',
     background: '#070B09',
+    surface: '#0D1511',
     text: '#F4FFF9',
+    mutedText: '#9CA3AF',
     accent: '#64EAAB'
   },
   {
@@ -84,7 +90,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#E98AAF',
     secondary: '#181116',
     background: '#0D080B',
+    surface: '#150E13',
     text: '#FFF5F8',
+    mutedText: '#A89F91',
     accent: '#F2A9C4'
   },
   {
@@ -93,7 +101,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#A98BFA',
     secondary: '#15121E',
     background: '#09070E',
+    surface: '#130F1C',
     text: '#F8F5FF',
+    mutedText: '#A78BFA',
     accent: '#C4B0FF'
   },
   {
@@ -102,7 +112,9 @@ export const colorPalettesList: ColorPalette[] = [
     primary: '#FFFFFF',
     secondary: '#181818',
     background: '#080808',
+    surface: '#141414',
     text: '#FFFFFF',
+    mutedText: '#A3A3A3',
     accent: '#D4D4D4'
   }
 ];
@@ -171,8 +183,23 @@ export const defaultDesignSettings: DesignSettings = {
     primary: '#C9A45C',
     secondary: '#111114',
     background: '#08080A',
+    surface: '#121216',
     text: '#F5F2EA',
+    mutedText: '#9CA3AF',
     accent: '#E0BB70'
+  },
+  typography: {
+    fontFamily: 'Plus Jakarta Sans',
+    headingFont: 'Playfair Display'
+  },
+  uiPreferences: {
+    buttonRadius: '12px',
+    cardRadius: '16px',
+    buttonStyle: 'rounded',
+    darkMode: true,
+    animationsEnabled: true,
+    glassEffect: false,
+    customCss: ''
   }
 };
 

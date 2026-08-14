@@ -1,16 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --font-serif: 'Playfair Display', Georgia, Cambria, 'Times New Roman', Times, serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-serif, 'Playfair Display', Georgia, Cambria, 'Times New Roman', Times, serif);
+  --font-sans: var(--font-sans, 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif);
 }
 
 :root {
   --color-primary: #C9A45C;
+  --primary-color: #C9A45C;
   --color-secondary: #111114;
+  --secondary-color: #111114;
   --color-bg: #08080A;
+  --background-color: #08080A;
+  --color-surface: #121216;
+  --surface-color: #121216;
   --color-text: #F5F2EA;
+  --text-color: #F5F2EA;
+  --color-muted: #9CA3AF;
+  --muted-text-color: #9CA3AF;
   --color-accent: #E0BB70;
+  --accent-color: #E0BB70;
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --heading-font: 'Playfair Display', Georgia, Cambria, serif;
+  --button-radius: 12px;
+  --card-radius: 16px;
 }
 
 body {
@@ -22,6 +35,14 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+.no-animations *,
+.no-animations *::before,
+.no-animations *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
+}
+
 /* Custom theme helper classes */
 .bg-custom-bg {
   background-color: var(--color-bg);
@@ -31,12 +52,20 @@ body {
   background-color: var(--color-secondary);
 }
 
+.bg-custom-surface {
+  background-color: var(--color-surface);
+}
+
 .text-custom-primary {
   color: var(--color-primary);
 }
 
 .text-custom-text {
   color: var(--color-text);
+}
+
+.text-custom-muted {
+  color: var(--color-muted);
 }
 
 .border-custom-primary {
@@ -54,12 +83,13 @@ body {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  border-radius: var(--button-radius, 12px);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 20px rgba(201, 164, 92, 0.2);
 }
 
 .btn-primary:hover {
-  background-color: #b8944d;
+  filter: brightness(1.1);
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(201, 164, 92, 0.35);
 }
@@ -71,6 +101,7 @@ body {
   color: var(--color-text);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  border-radius: var(--button-radius, 12px);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

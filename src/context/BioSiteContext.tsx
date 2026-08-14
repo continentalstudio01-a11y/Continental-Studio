@@ -30,6 +30,7 @@ import {
   MusicTrack
 } from '../types';
 import { setupAllTracking, fireMarketingEvent } from '../lib/tracking';
+import { applyThemeCSSVariables } from '../utils/theme';
 import {
   defaultSiteSettings,
   defaultDesignSettings,

@@ -74,7 +74,9 @@ export interface ColorPalette {
   primary: string;
   secondary: string;
   background: string;
+  surface?: string;
   text: string;
+  mutedText?: string;
   accent: string;
 }
 
@@ -85,8 +87,23 @@ export interface DesignSettings {
     primary: string;
     secondary: string;
     background: string;
+    surface?: string;
     text: string;
+    mutedText?: string;
     accent: string;
+  };
+  typography?: {
+    fontFamily: string;
+    headingFont: string;
+  };
+  uiPreferences?: {
+    buttonRadius: string;
+    cardRadius: string;
+    buttonStyle: 'rounded' | 'pill' | 'square' | 'gradient';
+    darkMode: boolean;
+    animationsEnabled: boolean;
+    glassEffect: boolean;
+    customCss?: string;
   };
 }
 
