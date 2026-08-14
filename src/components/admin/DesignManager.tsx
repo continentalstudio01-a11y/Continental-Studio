@@ -18,7 +18,10 @@ import {
   Moon,
   Sun,
   Upload,
-  RefreshCw
+  RefreshCw,
+  Database,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { DesignSettings, VisualStyleId, ColorPaletteId } from '../../types';
 import { applyThemeCSSVariables } from '../../utils/theme';
@@ -57,13 +60,24 @@ const CARD_RADIUS_OPTIONS = [
 ];
 
 export const DesignManager: React.FC = () => {
-  const { designSettings, updateDesignSettings, siteSettings, updateSiteSettings, saveAllData, isCloudSaving } = useBioSite();
+  const {
+    designSettings,
+    updateDesignSettings,
+    siteSettings,
+    updateSiteSettings,
+    saveAllData,
+    isCloudSaving,
+    diagnosticInfo,
+    forceSyncData,
+    isSyncing
+  } = useBioSite();
 
   const [currentDesign, setCurrentDesign] = useState<DesignSettings>(designSettings);
   const [logoUrl, setLogoUrl] = useState(siteSettings.logoUrl || '');
   const [faviconUrl, setFaviconUrl] = useState(siteSettings.seo?.favicon || '');
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'palette' | 'typography' | 'ui' | 'branding' | 'custom_css'>('palette');
+  const [syncSuccess, setSyncSuccess] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'palette' | 'typography' | 'ui' | 'branding' | 'custom_css' | 'diagnostic'>('palette');
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +218,14 @@ export const DesignManager: React.FC = () => {
     }
   };
 
+  const handleForceSync = async () => {
+    const ok = await forceSyncData();
+    if (ok) {
+      setSyncSuccess(true);
+      setTimeout(() => setSyncSuccess(false), 3000);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-5xl">
       {/* Header with Save / Reset actions */}
@@ -311,6 +333,17 @@ export const DesignManager: React.FC = () => {
           }`}
         >
           <Code className="w-4 h-4" /> CSS Personalizado
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('diagnostic')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'diagnostic'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              : 'text-white/60 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Database className="w-4 h-4" /> Diagnóstico & Banco
         </button>
       </div>
 
@@ -877,6 +910,133 @@ export const DesignManager: React.FC = () => {
               placeholder={`/* Exemplo de custom CSS */\n.btn-primary {\n  letter-spacing: 0.15em;\n}\n.custom-glass {\n  backdrop-filter: blur(20px);\n}`}
               className="w-full p-4 rounded-2xl bg-black/60 border border-white/15 font-mono text-xs text-amber-200 focus:border-amber-400 focus:outline-none leading-relaxed"
             />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: DIAGNÓSTICO & PERSISTÊNCIA GLOBAL */}
+      {activeSubTab === 'diagnostic' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2">
+                  <Database className="w-5 h-5" /> Auditoria & Diagnóstico de Persistência Cloud
+                </h3>
+                <p className="text-xs text-white/60 mt-1">
+                  Monitoramento em tempo real do Google Cloud Firestore e das variáveis CSS ativas no navegador.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleForceSync}
+                disabled={isSyncing}
+                className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-2 cursor-pointer transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Sincronizando...' : syncSuccess ? 'Sincronizado com Sucesso!' : 'Forçar Sincronização Agora'}
+              </button>
+            </div>
+
+            {/* Status Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Fonte de Dados Ativa</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span className="text-sm font-bold text-white">
+                    {diagnosticInfo.dataSource === 'firestore' ? 'Firestore Database' : diagnosticInfo.dataSource === 'server_api' ? 'Server API' : 'Cache Local / Fallback'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-white/40 block">Prioridade máxima ao carregar</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Status do Firestore</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-emerald-400 uppercase">{diagnosticInfo.firestoreStatus}</span>
+                </div>
+                <span className="text-[10px] text-white/40 block">Doc: biosite_data/main_settings</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Última Sincronização</span>
+                <div className="text-sm font-mono text-amber-300">{diagnosticInfo.lastSyncTimestamp}</div>
+                <span className="text-[10px] text-white/40 block">Recebido via Firestore snapshot</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Paleta Aplicada</span>
+                <div className="text-sm font-bold text-white capitalize">{diagnosticInfo.appliedPaletteId}</div>
+                <span className="text-[10px] text-white/40 block">Injetada nas variáveis CSS globais</span>
+              </div>
+            </div>
+
+            {/* Active CSS Variables Inspector */}
+            <div className="p-5 rounded-2xl bg-black/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5" /> Variáveis CSS Injetadas no Documento (:root)
+                </span>
+                <span className="text-[10px] font-mono text-white/50">document.documentElement.style</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-white/40 block">--color-primary</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded border border-white/20" style={{ backgroundColor: diagnosticInfo.appliedCSSVariables.primary }}></span>
+                    <span className="text-white font-bold">{diagnosticInfo.appliedCSSVariables.primary}</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-white/40 block">--color-bg</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded border border-white/20" style={{ backgroundColor: diagnosticInfo.appliedCSSVariables.background }}></span>
+                    <span className="text-white font-bold">{diagnosticInfo.appliedCSSVariables.background}</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-white/40 block">--color-surface</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded border border-white/20" style={{ backgroundColor: diagnosticInfo.appliedCSSVariables.surface }}></span>
+                    <span className="text-white font-bold">{diagnosticInfo.appliedCSSVariables.surface}</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <span className="text-[10px] text-white/40 block">--button-radius</span>
+                  <span className="text-white font-bold block">{diagnosticInfo.appliedCSSVariables.buttonRadius}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Diagnostic Event Log */}
+            <div className="p-5 rounded-2xl bg-black/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white/80 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Log de Eventos de Persistência (Últimos Eventos)
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  console.table(window.__CONTINENTAL_DIAGNOSTICS__())
+                </span>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-1.5 font-mono text-[11px] pr-2">
+                {diagnosticInfo.events.map((evt, idx) => (
+                  <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-white/5 border border-white/5">
+                    <span className="text-white/40 shrink-0">{evt.time}</span>
+                    <span className="text-amber-300 font-bold shrink-0">[{evt.event}]</span>
+                    <span className="text-white/70 truncate">
+                      {typeof evt.details === 'object' ? JSON.stringify(evt.details) : evt.details || 'Concluído'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

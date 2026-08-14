@@ -15,6 +15,8 @@ console.log('[Firebase Init] Connected to Firestore DB:', firestoreDbId || '(def
 console.log('[Firebase Init] Firestore & Auth services initialized successfully.');
 
 export {
+  firebaseConfig,
+  firestoreDbId,
   doc,
   getDoc,
   setDoc,

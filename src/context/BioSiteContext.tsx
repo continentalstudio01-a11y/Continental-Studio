@@ -48,6 +48,27 @@ import {
   defaultAudioSettings
 } from '../data/defaultData';
 
+export interface PersistenceDiagnostic {
+  dataSource: 'firestore' | 'server_api' | 'local_cache' | 'default_fallback';
+  lastSyncTimestamp: string;
+  lastDatabaseWrite: string;
+  appliedPaletteId: string;
+  firestoreStatus: 'connected' | 'loading' | 'error' | 'unavailable';
+  projectId: string;
+  firestoreDbId: string;
+  documentPath: string;
+  appliedCSSVariables: {
+    primary: string;
+    secondary: string;
+    background: string;
+    surface: string;
+    text: string;
+    buttonRadius: string;
+    cardRadius: string;
+  };
+  events: Array<{ time: string; event: string; details?: any }>;
+}
+
 interface BioSiteContextType {
   siteSettings: SiteSettings;
   updateSiteSettings: (settings: Partial<SiteSettings>) => void;
@@ -141,6 +162,7 @@ interface BioSiteContextType {
   isCloudSaving: boolean;
   isInitialLoading: boolean;
   isSyncing: boolean;
+  diagnosticInfo: PersistenceDiagnostic;
   forceSyncData: () => Promise<boolean>;
   saveAllData: (overrides?: any) => Promise<boolean>;
   exportAllDataJSON: () => string;
@@ -263,9 +285,49 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const isInitialCloudLoadDone = React.useRef<boolean>(false);
 
-  // Helper to apply incoming cloud/server data cleanly to state and localStorage
-  const applyIncomingData = useCallback((data: any) => {
+  // Diagnostic State for real-time audit & verification
+  const [diagnosticInfo, setDiagnosticInfo] = useState<PersistenceDiagnostic>(() => ({
+    dataSource: 'default_fallback',
+    lastSyncTimestamp: 'Nenhuma sincronização ainda',
+    lastDatabaseWrite: 'Nenhuma gravação nesta sessão',
+    appliedPaletteId: defaultDesignSettings.currentPaletteId || 'obsidian_gold',
+    firestoreStatus: 'loading',
+    projectId: 'gen-lang-client-0105007152',
+    firestoreDbId: 'ai-studio-continentalstudi-8b7dafe4-d6c2-4197-ab12-83630a2632a6',
+    documentPath: 'biosite_data/main_settings',
+    appliedCSSVariables: {
+      primary: '#C9A45C',
+      secondary: '#111114',
+      background: '#08080A',
+      surface: '#121216',
+      text: '#F5F2EA',
+      buttonRadius: '12px',
+      cardRadius: '16px'
+    },
+    events: [
+      {
+        time: new Date().toLocaleTimeString(),
+        event: 'THEME_LOAD_STARTED',
+        details: 'Iniciando carregamento do tema e conexão com Firestore DB...'
+      }
+    ]
+  }));
+
+  const logDiagnosticEvent = useCallback((eventName: string, details?: any) => {
+    const timeStr = new Date().toLocaleTimeString();
+    console.log(`[BioSite Diagnostic] [${eventName}]`, details || '');
+    setDiagnosticInfo((prev) => ({
+      ...prev,
+      events: [{ time: timeStr, event: eventName, details }, ...prev.events.slice(0, 19)]
+    }));
+  }, []);
+
+  // Helper to apply incoming cloud/server data cleanly to state, CSS variables, and localStorage
+  const applyIncomingData = useCallback((data: any, source: 'firestore' | 'server_api' = 'firestore') => {
     if (!data || typeof data !== 'object') return;
+    
+    console.log(`[BioSite Persistence] [THEME_DATABASE_RESPONSE] Applying verified data from source: ${source}`);
+    
     if (data.siteSettings) {
       setSiteSettings(data.siteSettings);
       safeSaveStored('siteSettings', data.siteSettings);
@@ -274,6 +336,11 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setDesignSettings(data.designSettings);
       applyThemeCSSVariables(data.designSettings);
       safeSaveStored('designSettings', data.designSettings);
+      logDiagnosticEvent('THEME_CSS_VARIABLES_APPLIED', {
+        paletteId: data.designSettings.currentPaletteId,
+        primary: data.designSettings.customColors?.primary,
+        source
+      });
     }
     if (Array.isArray(data.navItems)) {
       setNavItems(data.navItems);
@@ -319,8 +386,52 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAdminAuth(data.adminAuth);
       safeSaveStored('adminAuth', data.adminAuth);
     }
+
+    setDiagnosticInfo((prev) => ({
+      ...prev,
+      dataSource: source,
+      firestoreStatus: 'connected',
+      lastSyncTimestamp: new Date().toLocaleTimeString(),
+      appliedPaletteId: data.designSettings?.currentPaletteId || prev.appliedPaletteId,
+      appliedCSSVariables: {
+        primary: data.designSettings?.customColors?.primary || '#C9A45C',
+        secondary: data.designSettings?.customColors?.secondary || '#111114',
+        background: data.designSettings?.customColors?.background || '#08080A',
+        surface: data.designSettings?.customColors?.surface || '#121216',
+        text: data.designSettings?.customColors?.text || '#F5F2EA',
+        buttonRadius: data.designSettings?.uiPreferences?.buttonRadius || '12px',
+        cardRadius: data.designSettings?.uiPreferences?.cardRadius || '16px'
+      }
+    }));
+
+    isInitialCloudLoadDone.current = true;
     setIsCloudSynced(true);
     setIsInitialLoading(false);
+  }, [logDiagnosticEvent]);
+
+  // Expose global diagnostics for browser devtools
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__CONTINENTAL_DIAGNOSTICS__ = () => {
+        console.table({
+          DataSource: diagnosticInfo.dataSource,
+          FirestoreStatus: diagnosticInfo.firestoreStatus,
+          Document: diagnosticInfo.documentPath,
+          ProjectId: diagnosticInfo.projectId,
+          DatabaseId: diagnosticInfo.firestoreDbId,
+          LastSync: diagnosticInfo.lastSyncTimestamp,
+          AppliedPalette: diagnosticInfo.appliedPaletteId,
+          PrimaryColor: diagnosticInfo.appliedCSSVariables.primary,
+          BackgroundColor: diagnosticInfo.appliedCSSVariables.background
+        });
+        return diagnosticInfo;
+      };
+    }
+  }, [diagnosticInfo]);
+
+  // Initial CSS variable injection from current loaded state
+  useEffect(() => {
+    applyThemeCSSVariables(designSettings);
   }, []);
 
   // 1. Firebase Auth State Monitor
@@ -350,65 +461,70 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribeAuth();
   }, []);
 
-  // 2. Real-time onSnapshot listener + initial cloud/server data loader
+  // 2. Real-time onSnapshot listener + initial cloud data loader
   useEffect(() => {
     let isMounted = true;
 
-    console.log('[BioSite Sync] Starting real-time Firestore synchronization & multi-device loader...');
+    logDiagnosticEvent('THEME_LOAD_STARTED', {
+      time: new Date().toISOString(),
+      projectId: 'gen-lang-client-0105007152',
+      firestoreDatabaseId: 'ai-studio-continentalstudi-8b7dafe4-d6c2-4197-ab12-83630a2632a6'
+    });
 
-    // Safety timeout: Ensure initial loading screen smoothly resolves within 1.2s even on slow/offline networks
+    // Safety timeout: Ensure initial loading screen resolves cleanly within 2.5s if offline
     const safetyTimer = setTimeout(() => {
-      if (isMounted) {
+      if (isMounted && !isInitialCloudLoadDone.current) {
+        console.log('[BioSite Sync] Resolving initial loading screen after timeout...');
         setIsInitialLoading(false);
       }
-    }, 1200);
+    }, 2500);
 
-    // Step A: Fast Server-Side Fetch
-    fetch('/api/site-data')
-      .then((res) => res.json())
-      .then((json) => {
-        if (isMounted && json?.success && json?.data) {
-          console.log('[BioSite Sync] Server API data fetched successfully.');
-          applyIncomingData(json.data);
-        }
-      })
-      .catch((err) => {
-        console.warn('[BioSite Sync] Server API fetch notice:', err);
-      })
-      .finally(() => {
-        if (isMounted) isInitialCloudLoadDone.current = true;
-      });
-
-    // Step B: Real-time Cloud Firestore subscription via onSnapshot
+    // Primary Source: Real-time Cloud Firestore subscription
     try {
       const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
       console.log('[BioSite Firestore] Attaching continuous real-time onSnapshot listener to "biosite_data/main_settings"...');
 
-      // 1. Immediate getDoc fetch
+      // Immediate getDoc fetch
       getDoc(settingsDocRef)
         .then((snap) => {
           if (isMounted && snap.exists()) {
             const data = snap.data();
-            console.log('[BioSite Firestore] Initial Firestore getDoc document found. Merging state...');
-            applyIncomingData(data);
+            console.log('[BioSite Firestore] Initial Firestore document retrieved successfully.');
+            applyIncomingData(data, 'firestore');
+          } else if (isMounted) {
+            console.log('[BioSite Firestore] Document not yet created or empty in Firestore. Querying fallback API...');
+            // Fallback to server API if document was not created yet
+            fetch('/api/site-data')
+              .then((res) => res.json())
+              .then((json) => {
+                if (isMounted && json?.success && json?.data) {
+                  applyIncomingData(json.data, 'server_api');
+                }
+              })
+              .catch(() => {});
           }
         })
         .catch((err: any) => {
-          if (err?.code === 'unavailable') {
-            console.log('[BioSite Firestore] Client connecting in background, onSnapshot will stream data.');
-          } else {
-            console.warn('[BioSite Firestore Notice] getDoc notice:', err?.message || err);
-          }
+          console.warn('[BioSite Firestore Notice] getDoc notice:', err?.message || err);
+          // Try server API as secondary source
+          fetch('/api/site-data')
+            .then((res) => res.json())
+            .then((json) => {
+              if (isMounted && json?.success && json?.data) {
+                applyIncomingData(json.data, 'server_api');
+              }
+            })
+            .catch(() => {});
         });
 
-      // 2. Real-time onSnapshot listener for instant cross-device updates
+      // Real-time onSnapshot listener for instant cross-device updates
       const unsubscribe = onSnapshot(
         settingsDocRef,
         (snap) => {
           if (isMounted && snap.exists()) {
             const data = snap.data();
-            console.log('[BioSite Firestore Snapshot] Real-time document change received! Updating app state across devices...');
-            applyIncomingData(data);
+            console.log('[BioSite Firestore Snapshot] Real-time document change received from database!');
+            applyIncomingData(data, 'firestore');
           }
         },
         (error: any) => {
@@ -434,7 +550,7 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         clearTimeout(safetyTimer);
       };
     }
-  }, [applyIncomingData]);
+  }, [applyIncomingData, logDiagnosticEvent]);
 
   // 3. Force Sync Function (On-Demand Real-Time Sychronization)
   const forceSyncData = useCallback(async (): Promise<boolean> => {
@@ -722,7 +838,11 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
           const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
           await setDoc(settingsDocRef, sanitizedPayload, { merge: true });
-          console.log('[BioSite Persistence] Firestore Cloud Database document update succeeded.');
+          console.log('[BioSite Persistence] [THEME_PERSISTED_DATABASE] Firestore Cloud Database document update succeeded.');
+          logDiagnosticEvent('THEME_PERSISTED_DATABASE', {
+            paletteId: mergedDesignSettings.currentPaletteId,
+            time: new Date().toISOString()
+          });
         } catch (fErr: any) {
           console.error('[BioSite Persistence Firestore Error]:', {
             code: fErr?.code,
@@ -732,6 +852,12 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })();
 
       await Promise.allSettled([serverPromise, firestorePromise]);
+
+      setDiagnosticInfo((prev) => ({
+        ...prev,
+        lastDatabaseWrite: new Date().toLocaleTimeString(),
+        appliedPaletteId: mergedDesignSettings.currentPaletteId
+      }));
 
       setHasUnsavedChanges(false);
       setIsCloudSynced(true);
@@ -744,31 +870,6 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setHasUnsavedChanges(false);
       return false;
     }
-  };
-
-  // Dynamic Theme Palette Injector
-  const applyThemeCSSVariables = (ds: DesignSettings) => {
-    let palette = colorPalettesList.find((p) => p.id === ds.currentPaletteId);
-    let primary = palette ? palette.primary : ds.customColors.primary;
-    let secondary = palette ? palette.secondary : ds.customColors.secondary;
-    let bg = palette ? palette.background : ds.customColors.background;
-    let text = palette ? palette.text : ds.customColors.text;
-    let accent = palette ? palette.accent : ds.customColors.accent;
-
-    if (ds.currentPaletteId === 'custom') {
-      primary = ds.customColors.primary;
-      secondary = ds.customColors.secondary;
-      bg = ds.customColors.background;
-      text = ds.customColors.text;
-      accent = ds.customColors.accent;
-    }
-
-    const root = document.documentElement;
-    root.style.setProperty('--color-primary', primary);
-    root.style.setProperty('--color-secondary', secondary);
-    root.style.setProperty('--color-bg', bg);
-    root.style.setProperty('--color-text', text);
-    root.style.setProperty('--color-accent', accent);
   };
 
   // Updaters
@@ -1472,6 +1573,7 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isCloudSaving,
         isInitialLoading,
         isSyncing,
+        diagnosticInfo,
         forceSyncData,
         saveAllData,
         exportAllDataJSON,

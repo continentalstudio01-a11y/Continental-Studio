@@ -141,84 +141,85 @@ export const LinktreeBioHeader: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Main Linktree Card Frame */}
-      <motion.div
-        initial={{ opacity: 0, y: 25, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative bg-[#111114]/90 border border-[#C9A45C]/30 backdrop-blur-2xl rounded-[2rem] sm:rounded-[2.5rem] p-4 sm:p-8 shadow-[0_15px_50px_rgba(0,0,0,0.8)] overflow-hidden"
-      >
-        {/* Top Glow Ambient effect inside card */}
-        <div
-          className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-20"
-          style={{ backgroundColor: '#C9A45C' }}
-        />
-
-        {/* Profile Header Block */}
+        {/* Main Linktree Card Frame */}
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 flex flex-col items-center"
+          initial={{ opacity: 0, y: 25, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          style={{ borderRadius: 'var(--card-radius, 2rem)' }}
+          className="relative bg-[var(--color-surface,#111114)]/95 border border-[var(--color-primary,#C9A45C)]/30 backdrop-blur-2xl p-4 sm:p-8 shadow-[0_15px_50px_rgba(0,0,0,0.8)] overflow-hidden transition-all duration-300"
         >
-          {/* Avatar / Logo */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="relative mb-4 group cursor-pointer"
-            onClick={handleShare}
-          >
-            <div className="absolute -inset-1 rounded-full blur-md bg-[#C9A45C]/40 group-hover:bg-[#C9A45C]/80 transition duration-300" />
-            
-            {siteSettings.logoEnabled && siteSettings.logoUrl ? (
-              <img
-                src={siteSettings.logoUrl}
-                alt={siteSettings.brandName}
-                className="relative w-24 h-24 rounded-full object-cover border-2 border-[#C9A45C] shadow-2xl"
-              />
-            ) : siteSettings.avatarUrl ? (
-              <img
-                src={siteSettings.avatarUrl}
-                alt={siteSettings.brandName}
-                className="relative w-24 h-24 rounded-full object-cover border-2 border-[#C9A45C] shadow-2xl"
-              />
-            ) : (
-              <div className="relative w-24 h-24 rounded-full bg-[#1A1A20] border-2 border-[#C9A45C] flex items-center justify-center font-serif text-[#C9A45C] font-bold text-2xl shadow-2xl">
-                CS
-              </div>
-            )}
+          {/* Top Glow Ambient effect inside card */}
+          <div
+            className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-20"
+            style={{ backgroundColor: 'var(--color-primary, #C9A45C)' }}
+          />
 
-            {/* Verified Badge */}
-            <div
-              className="absolute bottom-0 right-0 p-1 bg-[#08080A] rounded-full border border-[#C9A45C]"
-              title="Perfil Oficial Verificado"
-            >
-              <CheckCircle2 className="w-5 h-5 text-[#C9A45C] fill-[#C9A45C]/20" />
-            </div>
-          </motion.div>
-
-          {/* Brand Title & Handle */}
+          {/* Profile Header Block */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-center gap-1.5 mb-1"
+            transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="relative z-10 flex flex-col items-center"
           >
-            <h1 className="text-2xl font-serif font-bold text-[#F5F2EA] tracking-tight">
-              {siteSettings.brandName || 'Continental Studio'}
-            </h1>
-            <CheckCircle2 className="w-5 h-5 text-[#C9A45C] fill-[#C9A45C]/20 shrink-0" />
-          </motion.div>
+            {/* Avatar / Logo */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="relative mb-4 group cursor-pointer"
+              onClick={handleShare}
+            >
+              <div className="absolute -inset-1 rounded-full blur-md bg-[var(--color-primary,#C9A45C)]/40 group-hover:bg-[var(--color-primary,#C9A45C)]/80 transition duration-300" />
+              
+              {siteSettings.logoEnabled && siteSettings.logoUrl ? (
+                <img
+                  src={siteSettings.logoUrl}
+                  alt={siteSettings.brandName}
+                  className="relative w-24 h-24 rounded-full object-cover border-2 border-[var(--color-primary,#C9A45C)] shadow-2xl"
+                />
+              ) : siteSettings.avatarUrl ? (
+                <img
+                  src={siteSettings.avatarUrl}
+                  alt={siteSettings.brandName}
+                  className="relative w-24 h-24 rounded-full object-cover border-2 border-[var(--color-primary,#C9A45C)] shadow-2xl"
+                />
+              ) : (
+                <div className="relative w-24 h-24 rounded-full bg-[#1A1A20] border-2 border-[var(--color-primary,#C9A45C)] flex items-center justify-center font-heading text-[var(--color-primary,#C9A45C)] font-bold text-2xl shadow-2xl">
+                  CS
+                </div>
+              )}
 
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.26 }}
-            className="text-xs font-mono text-[#C9A45C] tracking-widest font-semibold mb-3"
-          >
-            @continentalstudio • BioSite Oficial
-          </motion.span>
+              {/* Verified Badge */}
+              <div
+                className="absolute bottom-0 right-0 p-1 bg-[var(--color-bg,#08080A)] rounded-full border border-[var(--color-primary,#C9A45C)]"
+                title="Perfil Oficial Verificado"
+              >
+                <CheckCircle2 className="w-5 h-5 text-[var(--color-primary,#C9A45C)] fill-[var(--color-primary,#C9A45C)]/20" />
+              </div>
+            </motion.div>
+
+            {/* Brand Title & Handle */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-1.5 mb-1"
+            >
+              <h1 className="text-2xl font-heading font-bold text-[var(--color-text,#F5F2EA)] tracking-tight">
+                {siteSettings.brandName || 'Continental Studio'}
+              </h1>
+              <CheckCircle2 className="w-5 h-5 text-[var(--color-primary,#C9A45C)] fill-[var(--color-primary,#C9A45C)]/20 shrink-0" />
+            </motion.div>
+
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.26 }}
+              className="text-xs font-mono text-[var(--color-primary,#C9A45C)] tracking-widest font-semibold mb-3"
+            >
+              @continentalstudio • BioSite Oficial
+            </motion.span>
 
           {/* Online Status Pill */}
           <motion.div
@@ -319,10 +320,11 @@ export const LinktreeBioHeader: React.FC = () => {
                 whileHover={{ scale: 1.018, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleNavClick(item, activeVariant)}
-                className={`w-full relative group p-4 rounded-2xl font-sans transition-all duration-300 cursor-pointer shadow-lg border overflow-hidden ${attentionStyle} ${
+                style={{ borderRadius: 'var(--button-radius, 1rem)' }}
+                className={`w-full relative group p-4 font-sans transition-all duration-300 cursor-pointer shadow-lg border overflow-hidden ${attentionStyle} ${
                   isFeatured
-                    ? 'bg-gradient-to-r from-[#C9A45C] via-[#E0BB70] to-[#C9A45C] text-[#08080A] shadow-[0_8px_30px_rgba(201,164,92,0.35)] border-[#FFE3A0]'
-                    : 'bg-[#1A1A22]/90 hover:bg-[#22222C] border-[#C9A45C]/30 hover:border-[#C9A45C] text-[#F5F2EA] hover:shadow-[0_8px_25px_rgba(201,164,92,0.15)]'
+                    ? 'bg-gradient-to-r from-[var(--color-primary,#C9A45C)] via-[#E0BB70] to-[var(--color-primary,#C9A45C)] text-[var(--color-bg,#08080A)] shadow-[0_8px_30px_rgba(201,164,92,0.35)] border-amber-300/60'
+                    : 'bg-[var(--color-surface,#1A1A22)]/90 hover:bg-white/10 border-[var(--color-primary,#C9A45C)]/30 hover:border-[var(--color-primary,#C9A45C)] text-[var(--color-text,#F5F2EA)] hover:shadow-[0_8px_25px_rgba(201,164,92,0.15)]'
                 }`}
               >
                 {/* Shimmer effect overlay */}
@@ -340,13 +342,13 @@ export const LinktreeBioHeader: React.FC = () => {
                       className={`p-2.5 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ${
                         isFeatured
                           ? 'bg-black/10 text-black'
-                          : 'bg-[#C9A45C]/15 text-[#C9A45C] group-hover:bg-[#C9A45C]/25'
+                          : 'bg-[var(--color-primary,#C9A45C)]/15 text-[var(--color-primary,#C9A45C)] group-hover:bg-[var(--color-primary,#C9A45C)]/25'
                       }`}
                     >
                       <NavIcon
                         iconName={item.icon}
                         iconUrl={item.iconUrl}
-                        className={`w-5 h-5 ${isFeatured ? 'text-black' : 'text-[#C9A45C]'}`}
+                        className={`w-5 h-5 ${isFeatured ? 'text-black' : 'text-[var(--color-primary,#C9A45C)]'}`}
                       />
                     </div>
                     <div>
@@ -355,7 +357,7 @@ export const LinktreeBioHeader: React.FC = () => {
                           className={`font-extrabold text-sm tracking-wide block transition-colors ${
                             isFeatured
                               ? 'uppercase tracking-wider text-black'
-                              : 'text-[#F5F2EA] group-hover:text-[#C9A45C]'
+                              : 'text-[var(--color-text,#F5F2EA)] group-hover:text-[var(--color-primary,#C9A45C)]'
                           }`}
                         >
                           {displayLabel}
@@ -365,7 +367,7 @@ export const LinktreeBioHeader: React.FC = () => {
                           <span
                             className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
                               isFeatured
-                                ? 'bg-black text-[#C9A45C]'
+                                ? 'bg-black text-[var(--color-primary,#C9A45C)]'
                                 : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                             }`}
                           >
@@ -384,7 +386,7 @@ export const LinktreeBioHeader: React.FC = () => {
                       {displaySubtitle && (
                         <span
                           className={`text-[11px] block mt-0.5 ${
-                            isFeatured ? 'font-medium text-black/80' : 'text-[#F5F2EA]/60'
+                            isFeatured ? 'font-medium text-black/80' : 'text-[var(--color-text,#F5F2EA)]/60'
                           }`}
                         >
                           {displaySubtitle}
@@ -397,7 +399,7 @@ export const LinktreeBioHeader: React.FC = () => {
                     className={`w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300 shrink-0 ${
                       isFeatured
                         ? 'text-black'
-                        : 'text-[#C9A45C]/60 group-hover:text-[#C9A45C]'
+                        : 'text-[var(--color-primary,#C9A45C)]/60 group-hover:text-[var(--color-primary,#C9A45C)]'
                     }`}
                   />
                 </motion.div>

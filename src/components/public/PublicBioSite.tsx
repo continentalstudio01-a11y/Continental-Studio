@@ -87,7 +87,7 @@ export const PublicBioSite: React.FC = () => {
   }, [toggleAdminMode]);
 
   return (
-    <div className="min-h-screen bg-[#08080A] text-[#F5F2EA] relative selection:bg-[#C9A45C] selection:text-black overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--color-bg,#08080A)] text-[var(--color-text,#F5F2EA)] relative selection:bg-[var(--color-primary,#C9A45C)] selection:text-black overflow-x-hidden transition-colors duration-300">
       {/* Subtle Luxury Ambient Background Glows */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -95,9 +95,9 @@ export const PublicBioSite: React.FC = () => {
         transition={{ duration: 1.2, ease: 'easeOut' }}
         className="pointer-events-none fixed inset-0 overflow-hidden z-0"
       >
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-b from-[#C9A45C]/20 via-[#C9A45C]/5 to-transparent rounded-full blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-b from-[var(--color-primary,#C9A45C)]/20 via-[var(--color-primary,#C9A45C)]/5 to-transparent rounded-full blur-[120px]" />
         <div className="absolute top-[45%] -left-32 w-[450px] h-[450px] bg-purple-900/10 rounded-full blur-[100px]" />
-        <div className="absolute top-[75%] -right-32 w-[450px] h-[450px] bg-[#C9A45C]/10 rounded-full blur-[100px]" />
+        <div className="absolute top-[75%] -right-32 w-[450px] h-[450px] bg-[var(--color-primary,#C9A45C)]/10 rounded-full blur-[100px]" />
       </motion.div>
 
       {/* Top Banner Accent & Admin Navigation Header */}
@@ -105,11 +105,11 @@ export const PublicBioSite: React.FC = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="sticky top-0 z-50 bg-[#08080A]/95 backdrop-blur-md border-b border-[#C9A45C]/20 px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2"
+        className="sticky top-0 z-50 bg-[var(--color-bg,#08080A)]/95 backdrop-blur-md border-b border-[var(--color-primary,#C9A45C)]/20 px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-2 h-2 rounded-full bg-[#C9A45C] animate-ping shrink-0" />
-          <span className="text-[11px] sm:text-xs uppercase tracking-[0.18em] font-bold text-[#C9A45C] truncate">
+          <div className="w-2 h-2 rounded-full bg-[var(--color-primary,#C9A45C)] animate-ping shrink-0" />
+          <span className="text-[11px] sm:text-xs uppercase tracking-[0.18em] font-bold text-[var(--color-primary,#C9A45C)] truncate">
             {siteSettings.brandName || 'Continental Studio'}
           </span>
         </div>
@@ -121,7 +121,7 @@ export const PublicBioSite: React.FC = () => {
             className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/20 text-white/90 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
             title="Acompanhar o status do seu ensaio em tempo real"
           >
-            <PackageCheck className="w-3.5 h-3.5 text-[#C9A45C]" />
+            <PackageCheck className="w-3.5 h-3.5 text-[var(--color-primary,#C9A45C)]" />
             <span className="hidden sm:inline">Acompanhar Pedido</span>
             <span className="sm:hidden">Rastrear</span>
           </button>
