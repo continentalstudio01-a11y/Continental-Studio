@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBioSite } from '../../context/BioSiteContext';
-import { Save, Image, Upload, Check, Sparkles, MessageSquare, Globe, Zap } from 'lucide-react';
+import { Save, Image, Upload, Check, Sparkles, MessageSquare, Globe, Zap, Loader2 } from 'lucide-react';
 import { ImageDropzone } from '../common/ImageDropzone';
 
 export const ContentManager: React.FC = () => {
-  const { siteSettings, updateSiteSettings, saveAllData } = useBioSite();
+  const { siteSettings, updateSiteSettings, saveAllData, isCloudSaving } = useBioSite();
   const [formData, setFormData] = useState(siteSettings);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setFormData(siteSettings);
+  }, [siteSettings]);
 
   const updateField = (partial: Partial<typeof formData>) => {
     const updated = { ...formData, ...partial };
@@ -14,12 +18,14 @@ export const ContentManager: React.FC = () => {
     updateSiteSettings(updated);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     updateSiteSettings(formData);
-    saveAllData();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    const ok = await saveAllData({ siteSettings: formData });
+    if (ok) {
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    }
   };
 
   const handleBadgeChange = (idx: number, val: string) => {

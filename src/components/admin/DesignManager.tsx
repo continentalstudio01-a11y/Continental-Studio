@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBioSite } from '../../context/BioSiteContext';
 import { visualStylesList, colorPalettesList } from '../../data/defaultData';
-import { Palette, Sparkles, Check, Pipette } from 'lucide-react';
+import { Palette, Sparkles, Check, Pipette, Save } from 'lucide-react';
 
 export const DesignManager: React.FC = () => {
-  const { designSettings, updateDesignSettings } = useBioSite();
+  const { designSettings, updateDesignSettings, saveAllData } = useBioSite();
   const [current, setCurrent] = useState(designSettings);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setCurrent(designSettings);
+  }, [designSettings]);
 
   const handleStyleSelect = (styleId: any) => {
     const updated = { ...current, currentStyleId: styleId };
@@ -32,13 +37,31 @@ export const DesignManager: React.FC = () => {
     updateDesignSettings(updated);
   };
 
+  const handleSaveDesign = async () => {
+    const ok = await saveAllData({ designSettings: current });
+    if (ok) {
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl">
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-1">Design System & Temas Visual</h2>
-        <p className="text-xs text-white/60">
-          Personalize a estética do BioSite em tempo real com paletas de luxo, estilos e cores personalizadas.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1">Design System & Temas Visual</h2>
+          <p className="text-xs text-white/60">
+            Personalize a estética do BioSite em tempo real com paletas de luxo, estilos e cores personalizadas.
+          </p>
+        </div>
+
+        <button
+          onClick={handleSaveDesign}
+          className="btn-primary px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer shadow-xl"
+        >
+          <Save className="w-4 h-4" />
+          <span>{savedSuccess ? 'Design Salvo!' : 'Salvar Estilo'}</span>
+        </button>
       </div>
 
       {/* Visual Styles */}

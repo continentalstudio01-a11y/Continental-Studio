@@ -141,7 +141,7 @@ interface BioSiteContextType {
   isInitialLoading: boolean;
   isSyncing: boolean;
   forceSyncData: () => Promise<boolean>;
-  saveAllData: () => Promise<boolean> | boolean;
+  saveAllData: (overrides?: any) => Promise<boolean>;
   exportAllDataJSON: () => string;
   importAllDataJSON: (jsonString: string) => boolean;
   resetToDefaults: () => void;
@@ -151,6 +151,26 @@ interface BioSiteContextType {
 const BioSiteContext = createContext<BioSiteContextType | undefined>(undefined);
 
 const STORAGE_PREFIX = 'continental_studio_v1_';
+
+// Helper to safely sanitize any object for Google Cloud Firestore (removes undefined values that Firestore rejects)
+export function sanitizeForFirestore(value: any): any {
+  if (value === undefined) {
+    return null;
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForFirestore(item));
+  }
+  const result: Record<string, any> = {};
+  for (const [key, val] of Object.entries(value)) {
+    if (val !== undefined) {
+      result[key] = sanitizeForFirestore(val);
+    }
+  }
+  return result;
+}
 
 export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Local storage loaders with fallback
@@ -589,16 +609,18 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
           adminAuth
         };
 
+        const sanitizedPayload = sanitizeForFirestore(cloudPayload);
+
         // Server-Side API Sync
         fetch('/api/site-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cloudPayload)
+          body: JSON.stringify(sanitizedPayload)
         }).catch((e) => console.warn('[AutoSync Server Notice]', e));
 
         // Firestore Cloud Database Sync
         const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
-        await setDoc(settingsDocRef, cloudPayload, { merge: true });
+        await setDoc(settingsDocRef, sanitizedPayload, { merge: true });
 
         setIsCloudSaving(false);
         setHasUnsavedChanges(false);
@@ -607,7 +629,7 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn('[BioSite Cloud] Auto-sync notice:', err);
         setIsCloudSaving(false);
       }
-    }, 1500);
+    }, 1200);
 
     return () => clearTimeout(debounceTimer);
   }, [
@@ -628,47 +650,65 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ]);
 
   // Save All function explicitly flushing all states to LocalStorage, Server File Storage AND Firebase Firestore Cloud Database
-  const saveAllData = async (): Promise<boolean> => {
+  const saveAllData = async (overrides?: any): Promise<boolean> => {
     setIsCloudSaving(true);
     console.log('[BioSite Persistence] Starting manual Save All operation to LocalStorage, Server File Storage, and Firestore DB...');
     try {
-      safeSaveStored('siteSettings', siteSettings);
-      safeSaveStored('designSettings', designSettings);
-      safeSaveStored('navItems', navItems);
-      safeSaveStored('packages', packages);
-      safeSaveStored('portfolio', portfolio);
-      safeSaveStored('beforeAfterItems', beforeAfterItems);
-      safeSaveStored('testimonials', testimonials);
-      safeSaveStored('faqs', faqs);
-      safeSaveStored('howItWorksSteps', howItWorksSteps);
-      safeSaveStored('audioSettings', audioSettings);
-      safeSaveStored('leads', leads);
-      safeSaveStored('orders', orders);
-      safeSaveStored('analyticsEvents', analyticsEvents);
-      safeSaveStored('adminAuth', adminAuth);
+      const mergedSiteSettings = overrides?.siteSettings ?? siteSettings;
+      const mergedDesignSettings = overrides?.designSettings ?? designSettings;
+      const mergedNavItems = overrides?.navItems ?? navItems;
+      const mergedPackages = overrides?.packages ?? packages;
+      const mergedPortfolio = overrides?.portfolio ?? portfolio;
+      const mergedBeforeAfter = overrides?.beforeAfterItems ?? beforeAfterItems;
+      const mergedTestimonials = overrides?.testimonials ?? testimonials;
+      const mergedFaqs = overrides?.faqs ?? faqs;
+      const mergedSteps = overrides?.howItWorksSteps ?? howItWorksSteps;
+      const mergedAudio = overrides?.audioSettings ?? audioSettings;
+      const mergedLeads = overrides?.leads ?? leads;
+      const mergedOrders = overrides?.orders ?? orders;
+      const mergedAnalytics = overrides?.analyticsEvents ?? analyticsEvents;
+      const mergedAdminAuth = overrides?.adminAuth ?? adminAuth;
 
-      const cloudPayload = {
+      // 1. Immediately persist to LocalStorage for instant zero-latency caching
+      safeSaveStored('siteSettings', mergedSiteSettings);
+      safeSaveStored('designSettings', mergedDesignSettings);
+      safeSaveStored('navItems', mergedNavItems);
+      safeSaveStored('packages', mergedPackages);
+      safeSaveStored('portfolio', mergedPortfolio);
+      safeSaveStored('beforeAfterItems', mergedBeforeAfter);
+      safeSaveStored('testimonials', mergedTestimonials);
+      safeSaveStored('faqs', mergedFaqs);
+      safeSaveStored('howItWorksSteps', mergedSteps);
+      safeSaveStored('audioSettings', mergedAudio);
+      safeSaveStored('leads', mergedLeads);
+      safeSaveStored('orders', mergedOrders);
+      safeSaveStored('analyticsEvents', mergedAnalytics);
+      safeSaveStored('adminAuth', mergedAdminAuth);
+
+      const rawPayload = {
         updatedAt: new Date().toISOString(),
-        siteSettings,
-        designSettings,
-        navItems,
-        packages,
-        portfolio,
-        beforeAfterItems,
-        testimonials,
-        faqs,
-        howItWorksSteps,
-        audioSettings,
-        leads,
-        orders,
-        adminAuth
+        siteSettings: mergedSiteSettings,
+        designSettings: mergedDesignSettings,
+        navItems: mergedNavItems,
+        packages: mergedPackages,
+        portfolio: mergedPortfolio,
+        beforeAfterItems: mergedBeforeAfter,
+        testimonials: mergedTestimonials,
+        faqs: mergedFaqs,
+        howItWorksSteps: mergedSteps,
+        audioSettings: mergedAudio,
+        leads: mergedLeads,
+        orders: mergedOrders,
+        adminAuth: mergedAdminAuth
       };
 
-      // 1. Save to Persistent Server API (guarantees instant cross-browser & multi-device loading)
+      const sanitizedPayload = sanitizeForFirestore(rawPayload);
+
+      // 2. Save to Persistent Server API (guarantees instant cross-browser & multi-device loading)
       const serverPromise = fetch('/api/site-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cloudPayload)
+        body: JSON.stringify(sanitizedPayload)
       })
         .then((res) => res.json())
         .then((data) => {
@@ -676,11 +716,11 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         })
         .catch((err) => console.warn('[BioSite API Save Notice]:', err));
 
-      // 2. Save to Google Cloud Firestore Database
+      // 3. Save to Google Cloud Firestore Database (properly sanitized)
       const firestorePromise = (async () => {
         try {
           const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
-          await setDoc(settingsDocRef, cloudPayload, { merge: true });
+          await setDoc(settingsDocRef, sanitizedPayload, { merge: true });
           console.log('[BioSite Persistence] Firestore Cloud Database document update succeeded.');
         } catch (fErr: any) {
           console.error('[BioSite Persistence Firestore Error]:', {
@@ -701,7 +741,7 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.error('[BioSite Persistence] Error saving data:', e);
       setIsCloudSaving(false);
       setHasUnsavedChanges(false);
-      return true;
+      return false;
     }
   };
 
@@ -732,18 +772,27 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Updaters
   const updateSiteSettings = (partial: Partial<SiteSettings>) => {
-    setSiteSettings((prev) => ({ ...prev, ...partial }));
+    setSiteSettings((prev) => {
+      const next = { ...prev, ...partial };
+      safeSaveStored('siteSettings', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updateDesignSettings = (partial: Partial<DesignSettings>) => {
     setDesignSettings((prev) => {
       const next = { ...prev, ...partial };
+      safeSaveStored('designSettings', next);
       return next;
     });
+    setHasUnsavedChanges(true);
   };
 
   const updateNavItems = (items: NavItem[]) => {
     setNavItems(items);
+    safeSaveStored('navItems', items);
+    setHasUnsavedChanges(true);
   };
 
   // Package CRUD
@@ -752,15 +801,30 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...pkgData,
       id: 'pkg-' + Date.now()
     };
-    setPackages((prev) => [...prev, newPkg]);
+    setPackages((prev) => {
+      const next = [...prev, newPkg];
+      safeSaveStored('packages', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updatePackage = (id: string, partial: Partial<Package>) => {
-    setPackages((prev) => prev.map((p) => (p.id === id ? { ...p, ...partial } : p)));
+    setPackages((prev) => {
+      const next = prev.map((p) => (p.id === id ? { ...p, ...partial } : p));
+      safeSaveStored('packages', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const deletePackage = (id: string) => {
-    setPackages((prev) => prev.filter((p) => p.id !== id));
+    setPackages((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      safeSaveStored('packages', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const duplicatePackage = (id: string) => {
@@ -772,7 +836,12 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       name: `${target.name} (Cópia)`,
       featured: false
     };
-    setPackages((prev) => [...prev, duplicated]);
+    setPackages((prev) => {
+      const next = [...prev, duplicated];
+      safeSaveStored('packages', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   // Portfolio CRUD
@@ -781,15 +850,30 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...item,
       id: 'port-' + Date.now()
     };
-    setPortfolio((prev) => [newItem, ...prev]);
+    setPortfolio((prev) => {
+      const next = [newItem, ...prev];
+      safeSaveStored('portfolio', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updatePortfolioItem = (id: string, partial: Partial<PortfolioItem>) => {
-    setPortfolio((prev) => prev.map((p) => (p.id === id ? { ...p, ...partial } : p)));
+    setPortfolio((prev) => {
+      const next = prev.map((p) => (p.id === id ? { ...p, ...partial } : p));
+      safeSaveStored('portfolio', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const deletePortfolioItem = (id: string) => {
-    setPortfolio((prev) => prev.filter((p) => p.id !== id));
+    setPortfolio((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      safeSaveStored('portfolio', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   // Before & After CRUD
@@ -798,22 +882,35 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...item,
       id: 'ba-' + Date.now()
     };
-    setBeforeAfterItems((prev) => [newItem, ...prev]);
+    setBeforeAfterItems((prev) => {
+      const next = [newItem, ...prev];
+      safeSaveStored('beforeAfterItems', next);
+      return next;
+    });
     setHasUnsavedChanges(true);
   };
 
   const updateBeforeAfterItem = (id: string, partial: Partial<BeforeAfterItem>) => {
-    setBeforeAfterItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...partial } : item)));
+    setBeforeAfterItems((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, ...partial } : item));
+      safeSaveStored('beforeAfterItems', next);
+      return next;
+    });
     setHasUnsavedChanges(true);
   };
 
   const deleteBeforeAfterItem = (id: string) => {
-    setBeforeAfterItems((prev) => prev.filter((item) => item.id !== id));
+    setBeforeAfterItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      safeSaveStored('beforeAfterItems', next);
+      return next;
+    });
     setHasUnsavedChanges(true);
   };
 
   const reorderBeforeAfterItems = (items: BeforeAfterItem[]) => {
     setBeforeAfterItems(items);
+    safeSaveStored('beforeAfterItems', items);
     setHasUnsavedChanges(true);
   };
 
@@ -823,15 +920,30 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...item,
       id: 'test-' + Date.now()
     };
-    setTestimonials((prev) => [...prev, newItem]);
+    setTestimonials((prev) => {
+      const next = [...prev, newItem];
+      safeSaveStored('testimonials', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updateTestimonial = (id: string, partial: Partial<Testimonial>) => {
-    setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, ...partial } : t)));
+    setTestimonials((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, ...partial } : t));
+      safeSaveStored('testimonials', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const deleteTestimonial = (id: string) => {
-    setTestimonials((prev) => prev.filter((t) => t.id !== id));
+    setTestimonials((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      safeSaveStored('testimonials', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   // FAQ CRUD
@@ -840,15 +952,30 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...item,
       id: 'faq-' + Date.now()
     };
-    setFaqs((prev) => [...prev, newItem]);
+    setFaqs((prev) => {
+      const next = [...prev, newItem];
+      safeSaveStored('faqs', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const updateFAQ = (id: string, partial: Partial<FAQItem>) => {
-    setFaqs((prev) => prev.map((f) => (f.id === id ? { ...f, ...partial } : f)));
+    setFaqs((prev) => {
+      const next = prev.map((f) => (f.id === id ? { ...f, ...partial } : f));
+      safeSaveStored('faqs', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   const deleteFAQ = (id: string) => {
-    setFaqs((prev) => prev.filter((f) => f.id !== id));
+    setFaqs((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      safeSaveStored('faqs', next);
+      return next;
+    });
+    setHasUnsavedChanges(true);
   };
 
   // How It Works Step handlers

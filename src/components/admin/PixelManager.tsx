@@ -29,7 +29,7 @@ interface EventLog {
 }
 
 export const PixelManager: React.FC = () => {
-  const { siteSettings, updateSiteSettings, trackEvent } = useBioSite();
+  const { siteSettings, updateSiteSettings, trackEvent, saveAllData } = useBioSite();
 
   const [metaPixelId, setMetaPixelId] = useState(siteSettings.tracking?.metaPixelId || '');
   const [ga4Id, setGa4Id] = useState(siteSettings.tracking?.googleAnalyticsId || '');
@@ -56,18 +56,27 @@ export const PixelManager: React.FC = () => {
     }
   }, [siteSettings.tracking]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanMeta = metaPixelId.trim();
     const cleanGa4 = ga4Id.trim();
     const cleanGtm = gtmId.trim();
 
+    const updatedTracking = {
+      metaPixelId: cleanMeta,
+      googleAnalyticsId: cleanGa4,
+      googleTagManagerId: cleanGtm,
+      enabled: Boolean(cleanMeta || cleanGa4 || cleanGtm)
+    };
+
     updateSiteSettings({
-      tracking: {
-        metaPixelId: cleanMeta,
-        googleAnalyticsId: cleanGa4,
-        googleTagManagerId: cleanGtm,
-        enabled: Boolean(cleanMeta || cleanGa4 || cleanGtm)
+      tracking: updatedTracking
+    });
+
+    await saveAllData({
+      siteSettings: {
+        ...siteSettings,
+        tracking: updatedTracking
       }
     });
 

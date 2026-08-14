@@ -61,12 +61,23 @@ export const AdminLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Alterações gravadas no Firestore Cloud com sucesso!');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleGlobalSave = async () => {
-    await saveAllData();
-    setToastMessage('Alterações gravadas no Firestore Cloud com sucesso!');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3500);
+    const success = await saveAllData();
+    if (success) {
+      setSaveSuccess(true);
+      setToastMessage('Todas as alterações foram gravadas no Firestore com sucesso!');
+      setShowToast(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setShowToast(false);
+      }, 3500);
+    } else {
+      setToastMessage('Alterações salvas localmente e sincronizando em segundo plano.');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3500);
+    }
   };
 
   const handleForceSync = async () => {
@@ -181,7 +192,9 @@ export const AdminLayout: React.FC = () => {
             onClick={handleGlobalSave}
             disabled={isCloudSaving}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all duration-300 cursor-pointer shadow-lg ${
-              hasUnsavedChanges
+              saveSuccess
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-black shadow-emerald-500/30'
+                : hasUnsavedChanges
                 ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black animate-pulse shadow-amber-500/30 hover:scale-105'
                 : 'bg-[#C9A45C] hover:bg-[#b8934b] text-black shadow-amber-500/20'
             }`}
@@ -189,13 +202,19 @@ export const AdminLayout: React.FC = () => {
           >
             {isCloudSaving ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : saveSuccess ? (
+              <Check className="w-4 h-4 text-black font-extrabold stroke-[3]" />
             ) : (
               <Save className="w-4 h-4" />
             )}
             <span className="font-extrabold uppercase tracking-wider">
-              {isCloudSaving ? 'Salvando na Nuvem...' : 'Salvar Tudo'}
+              {isCloudSaving
+                ? 'Salvando na Nuvem...'
+                : saveSuccess
+                ? 'Salvo com Sucesso!'
+                : 'Salvar Tudo'}
             </span>
-            {hasUnsavedChanges && (
+            {hasUnsavedChanges && !saveSuccess && !isCloudSaving && (
               <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />
             )}
           </button>

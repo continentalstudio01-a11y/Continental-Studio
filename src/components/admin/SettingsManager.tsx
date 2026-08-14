@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useBioSite } from '../../context/BioSiteContext';
 import {
   Key,
@@ -77,6 +77,7 @@ export const SettingsManager: React.FC = () => {
     importAllDataJSON,
     trackEvent,
     forceSyncData,
+    saveAllData,
     isSyncing,
     isCloudSynced
   } = useBioSite();
@@ -137,69 +138,96 @@ export const SettingsManager: React.FC = () => {
   const [supabaseKey, setSupabaseKey] = useState(siteSettings.supabaseConfig?.anonKey || '');
   const [supabaseSaved, setSupabaseSaved] = useState(false);
 
+  // Synchronize local form inputs when cloud siteSettings updates
+  useEffect(() => {
+    if (siteSettings.seo?.favicon) setFaviconUrl(siteSettings.seo.favicon);
+    if (siteSettings.seo?.pageTitle) setPageTitle(siteSettings.seo.pageTitle);
+    if (siteSettings.seo?.metaDescription) setMetaDescription(siteSettings.seo.metaDescription);
+    if (siteSettings.tracking) {
+      setMetaPixelId(siteSettings.tracking.metaPixelId || '');
+      setGa4Id(siteSettings.tracking.googleAnalyticsId || '');
+      setGtmId(siteSettings.tracking.googleTagManagerId || '');
+    }
+    if (siteSettings.urgency) {
+      setUrgencyEnabled(siteSettings.urgency.enabled ?? true);
+      setAvailableSlots(siteSettings.urgency.availableSlots ?? 3);
+      setTotalSlots(siteSettings.urgency.totalSlots ?? 15);
+      setCountdownHours(siteSettings.urgency.countdownHours ?? 3);
+      setHighlightBadge(siteSettings.urgency.highlightBadge ?? 'Vagas da Semana');
+      setBannerText(siteSettings.urgency.bannerText ?? 'Vagas limitadas para entrega em até 24h!');
+      setShowInHeader(siteSettings.urgency.showInHeader ?? true);
+      setShowInPackages(siteSettings.urgency.showInPackages ?? true);
+    }
+    if (siteSettings.supabaseConfig) {
+      setSupabaseUrl(siteSettings.supabaseConfig.url || '');
+      setSupabaseKey(siteSettings.supabaseConfig.anonKey || '');
+    }
+  }, [siteSettings]);
+
   // Favicon Saver Handler
-  const handleSaveFavicon = (e?: React.FormEvent) => {
+  const handleSaveFavicon = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    updateSiteSettings({
-      seo: {
-        ...siteSettings.seo,
-        favicon: faviconUrl.trim(),
-        pageTitle: pageTitle.trim(),
-        metaDescription: metaDescription.trim()
-      }
-    });
+    const updatedSeo = {
+      ...siteSettings.seo,
+      favicon: faviconUrl.trim(),
+      pageTitle: pageTitle.trim(),
+      metaDescription: metaDescription.trim()
+    };
+    updateSiteSettings({ seo: updatedSeo });
+    await saveAllData({ siteSettings: { ...siteSettings, seo: updatedSeo } });
     setFaviconSaved(true);
     setTimeout(() => setFaviconSaved(false), 3000);
   };
 
-  const handleSelectPreset = (presetUrl: string) => {
+  const handleSelectPreset = async (presetUrl: string) => {
     setFaviconUrl(presetUrl);
-    updateSiteSettings({
-      seo: {
-        ...siteSettings.seo,
-        favicon: presetUrl,
-        pageTitle: pageTitle.trim(),
-        metaDescription: metaDescription.trim()
-      }
-    });
+    const updatedSeo = {
+      ...siteSettings.seo,
+      favicon: presetUrl,
+      pageTitle: pageTitle.trim(),
+      metaDescription: metaDescription.trim()
+    };
+    updateSiteSettings({ seo: updatedSeo });
+    await saveAllData({ siteSettings: { ...siteSettings, seo: updatedSeo } });
     setFaviconSaved(true);
     setTimeout(() => setFaviconSaved(false), 3000);
   };
 
-  const handleCustomFaviconUpload = (base64List: string[]) => {
+  const handleCustomFaviconUpload = async (base64List: string[]) => {
     if (base64List.length > 0) {
       const newFavicon = base64List[0];
       setFaviconUrl(newFavicon);
-      updateSiteSettings({
-        seo: {
-          ...siteSettings.seo,
-          favicon: newFavicon,
-          pageTitle: pageTitle.trim(),
-          metaDescription: metaDescription.trim()
-        }
-      });
+      const updatedSeo = {
+        ...siteSettings.seo,
+        favicon: newFavicon,
+        pageTitle: pageTitle.trim(),
+        metaDescription: metaDescription.trim()
+      };
+      updateSiteSettings({ seo: updatedSeo });
+      await saveAllData({ siteSettings: { ...siteSettings, seo: updatedSeo } });
       setFaviconSaved(true);
       setTimeout(() => setFaviconSaved(false), 3000);
     }
   };
 
-  const handleSaveCredentials = (e: React.FormEvent) => {
+  const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     updateAdminCredentials(adminEmail, adminPass);
+    await saveAllData();
     setPassSaved(true);
     setTimeout(() => setPassSaved(false), 3000);
   };
 
-  const handleSaveTracking = (e: React.FormEvent) => {
+  const handleSaveTracking = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSiteSettings({
-      tracking: {
-        metaPixelId: metaPixelId.trim(),
-        googleAnalyticsId: ga4Id.trim(),
-        googleTagManagerId: gtmId.trim(),
-        enabled: Boolean(metaPixelId.trim() || ga4Id.trim() || gtmId.trim())
-      }
-    });
+    const updatedTracking = {
+      metaPixelId: metaPixelId.trim(),
+      googleAnalyticsId: ga4Id.trim(),
+      googleTagManagerId: gtmId.trim(),
+      enabled: Boolean(metaPixelId.trim() || ga4Id.trim() || gtmId.trim())
+    };
+    updateSiteSettings({ tracking: updatedTracking });
+    await saveAllData({ siteSettings: { ...siteSettings, tracking: updatedTracking } });
     setTrackingSaved(true);
     setTimeout(() => setTrackingSaved(false), 3000);
   };
@@ -215,33 +243,33 @@ export const SettingsManager: React.FC = () => {
     setTimeout(() => setTestEventSent(false), 4000);
   };
 
-  const handleSaveUrgency = (e: React.FormEvent) => {
+  const handleSaveUrgency = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSiteSettings({
-      urgency: {
-        enabled: urgencyEnabled,
-        availableSlots: Number(availableSlots),
-        totalSlots: Number(totalSlots),
-        countdownHours: Number(countdownHours),
-        highlightBadge: highlightBadge.trim(),
-        bannerText: bannerText.trim(),
-        showInHeader,
-        showInPackages
-      }
-    });
+    const updatedUrgency = {
+      enabled: urgencyEnabled,
+      availableSlots: Number(availableSlots),
+      totalSlots: Number(totalSlots),
+      countdownHours: Number(countdownHours),
+      highlightBadge: highlightBadge.trim(),
+      bannerText: bannerText.trim(),
+      showInHeader,
+      showInPackages
+    };
+    updateSiteSettings({ urgency: updatedUrgency });
+    await saveAllData({ siteSettings: { ...siteSettings, urgency: updatedUrgency } });
     setUrgencySaved(true);
     setTimeout(() => setUrgencySaved(false), 3000);
   };
 
-  const handleSaveSupabase = (e: React.FormEvent) => {
+  const handleSaveSupabase = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSiteSettings({
-      supabaseConfig: {
-        url: supabaseUrl,
-        anonKey: supabaseKey,
-        connected: Boolean(supabaseUrl && supabaseKey)
-      }
-    });
+    const updatedSupabase = {
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+      connected: Boolean(supabaseUrl && supabaseKey)
+    };
+    updateSiteSettings({ supabaseConfig: updatedSupabase });
+    await saveAllData({ siteSettings: { ...siteSettings, supabaseConfig: updatedSupabase } });
     setSupabaseSaved(true);
     setTimeout(() => setSupabaseSaved(false), 3000);
   };
