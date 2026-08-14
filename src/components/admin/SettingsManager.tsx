@@ -75,8 +75,21 @@ export const SettingsManager: React.FC = () => {
     clearOperationalData,
     exportAllDataJSON,
     importAllDataJSON,
-    trackEvent
+    trackEvent,
+    forceSyncData,
+    isSyncing,
+    isCloudSynced
   } = useBioSite();
+
+  const [forceSyncSuccess, setForceSyncSuccess] = useState(false);
+
+  const handleManualForceSync = async () => {
+    const ok = await forceSyncData();
+    if (ok) {
+      setForceSyncSuccess(true);
+      setTimeout(() => setForceSyncSuccess(false), 3000);
+    }
+  };
 
   // Active Sub-Tab
   const [activeSubTab, setActiveSubTab] = useState<'favicon' | 'tracking' | 'urgency' | 'credentials' | 'backup'>('favicon');
@@ -761,18 +774,31 @@ export const SettingsManager: React.FC = () => {
       {activeSubTab === 'backup' && (
         <div className="space-y-6">
           {/* Cloud Firestore Status */}
-          <div className="p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-base font-bold text-emerald-300 flex items-center gap-2">
                 <Database className="w-4 h-4 text-emerald-400" /> Banco de Dados em Nuvem (Firebase Firestore)
               </h3>
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Conectado & Ativo
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Sincronização em Tempo Real Ativa
+                </span>
+              </div>
             </div>
             <p className="text-xs text-emerald-200/80 leading-relaxed">
-              Seus dados, pacotes, fotos e configurações estão sendo sincronizados continuamente com o banco de dados em nuvem da Google. Qualquer alteração fica salva permanentemente mesmo após reiniciar ou recarregar a página.
+              Seus dados, pacotes, fotos e configurações estão sendo sincronizados continuamente com o Firebase Firestore através de ouvintes de streaming (<code>onSnapshot</code>). Qualquer alteração feita em um dispositivo é refletida instantaneamente em todos os navegadores conectados.
             </p>
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleManualForceSync}
+                disabled={isSyncing}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/20"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Sincronizando do Firestore...' : forceSyncSuccess ? 'Sincronizado com Sucesso!' : 'Forçar Sincronização em Tempo Real'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Supabase Integration (Optional secondary backend) */}

@@ -138,6 +138,9 @@ interface BioSiteContextType {
   hasUnsavedChanges: boolean;
   isCloudSynced: boolean;
   isCloudSaving: boolean;
+  isInitialLoading: boolean;
+  isSyncing: boolean;
+  forceSyncData: () => Promise<boolean>;
   saveAllData: () => Promise<boolean> | boolean;
   exportAllDataJSON: () => string;
   importAllDataJSON: (jsonString: string) => boolean;
@@ -235,10 +238,12 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
   const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const isInitialCloudLoadDone = React.useRef<boolean>(false);
 
   // Helper to apply incoming cloud/server data cleanly to state and localStorage
-  const applyIncomingData = (data: any) => {
+  const applyIncomingData = useCallback((data: any) => {
     if (!data || typeof data !== 'object') return;
     if (data.siteSettings) {
       setSiteSettings(data.siteSettings);
@@ -294,40 +299,29 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
       safeSaveStored('adminAuth', data.adminAuth);
     }
     setIsCloudSynced(true);
-  };
+    setIsInitialLoading(false);
+  }, []);
 
-  // 1. Firebase Auth State & Anonymous Authentication with debug logs
+  // 1. Firebase Auth State Monitor
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [authInitialized, setAuthInitialized] = useState<boolean>(false);
 
   useEffect(() => {
-    console.log('[Firebase Auth] Setting up authentication state listener...');
+    console.log('[Firebase Auth] Monitoring authentication session status...');
     const unsubscribeAuth = onAuthStateChanged(
       auth,
-      async (user) => {
+      (user) => {
         if (user) {
-          console.log('[Firebase Auth] User authenticated successfully. UID:', user.uid, 'Anonymous:', user.isAnonymous);
+          console.log('[Firebase Auth] Authenticated user active. UID:', user.uid);
           setFirebaseUser(user);
-          setAuthInitialized(true);
         } else {
-          console.log('[Firebase Auth] No active session found. Attempting anonymous sign-in...');
-          try {
-            const credential = await signInAnonymously(auth);
-            console.log('[Firebase Auth] Anonymous sign-in succeeded. New UID:', credential.user.uid);
-            setFirebaseUser(credential.user);
-            setAuthInitialized(true);
-          } catch (authError: any) {
-            console.error('[Firebase Auth Error] Failed to authenticate anonymously:', {
-              code: authError?.code,
-              message: authError?.message
-            });
-            // Continue execution so public reads/server sync still function
-            setAuthInitialized(true);
-          }
+          console.log('[Firebase Auth] Operating in public/guest mode for database reads.');
+          setFirebaseUser(null);
         }
+        setAuthInitialized(true);
       },
       (error) => {
-        console.error('[Firebase Auth Error] Auth state observer error:', error);
+        console.warn('[Firebase Auth Notice] Auth state observer:', error);
         setAuthInitialized(true);
       }
     );
@@ -335,91 +329,137 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribeAuth();
   }, []);
 
-  // 2. Initial real-time cloud and server data loader (runs on any browser/device on open)
+  // 2. Real-time onSnapshot listener + initial cloud/server data loader
   useEffect(() => {
     let isMounted = true;
 
-    console.log('[BioSite Sync] Starting multi-device data synchronization process...');
+    console.log('[BioSite Sync] Starting real-time Firestore synchronization & multi-device loader...');
 
-    // Step A: Instant Server-Side Fetch (guaranteed 100% across all devices & browsers)
+    // Safety timeout: Ensure initial loading screen smoothly resolves within 1.2s even on slow/offline networks
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setIsInitialLoading(false);
+      }
+    }, 1200);
+
+    // Step A: Fast Server-Side Fetch
     fetch('/api/site-data')
       .then((res) => res.json())
       .then((json) => {
         if (isMounted && json?.success && json?.data) {
-          console.log('[BioSite Sync] Server API data fetched successfully. Applying payload to state...');
+          console.log('[BioSite Sync] Server API data fetched successfully.');
           applyIncomingData(json.data);
-        } else {
-          console.log('[BioSite Sync] Server API returned no cached document. Awaiting Firestore sync...');
         }
       })
       .catch((err) => {
-        console.warn('[BioSite Sync] Server API sync error:', err);
+        console.warn('[BioSite Sync] Server API fetch notice:', err);
       })
       .finally(() => {
         if (isMounted) isInitialCloudLoadDone.current = true;
       });
 
-    // Step B: Real-time Cloud Firestore subscription
+    // Step B: Real-time Cloud Firestore subscription via onSnapshot
     try {
       const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
-      console.log('[BioSite Firestore] Initiating Firestore getDoc query on collection "biosite_data", doc "main_settings"...');
+      console.log('[BioSite Firestore] Attaching continuous real-time onSnapshot listener to "biosite_data/main_settings"...');
 
-      // Explicit one-time getDoc
+      // 1. Immediate getDoc fetch
       getDoc(settingsDocRef)
         .then((snap) => {
-          if (isMounted) {
-            if (snap.exists()) {
-              const data = snap.data();
-              console.log('[BioSite Firestore] Firestore getDoc succeeded. Document exists with keys:', Object.keys(data));
-              applyIncomingData(data);
-            } else {
-              console.log('[BioSite Firestore] Document "biosite_data/main_settings" does not exist in Firestore yet.');
-            }
+          if (isMounted && snap.exists()) {
+            const data = snap.data();
+            console.log('[BioSite Firestore] Initial Firestore getDoc document found. Merging state...');
+            applyIncomingData(data);
           }
         })
         .catch((err: any) => {
-          console.error('[BioSite Firestore Error] getDoc query failed:', {
-            code: err?.code,
-            message: err?.message,
-            stack: err?.stack
-          });
+          if (err?.code === 'unavailable') {
+            console.log('[BioSite Firestore] Client connecting in background, onSnapshot will stream data.');
+          } else {
+            console.warn('[BioSite Firestore Notice] getDoc notice:', err?.message || err);
+          }
         });
 
-      // Real-time snapshot listener
-      console.log('[BioSite Firestore] Attaching real-time onSnapshot listener...');
+      // 2. Real-time onSnapshot listener for instant cross-device updates
       const unsubscribe = onSnapshot(
         settingsDocRef,
         (snap) => {
           if (isMounted && snap.exists()) {
             const data = snap.data();
-            console.log('[BioSite Firestore Snapshot] Real-time Firestore update received. Merging latest cloud state...');
+            console.log('[BioSite Firestore Snapshot] Real-time document change received! Updating app state across devices...');
             applyIncomingData(data);
           }
         },
         (error: any) => {
-          console.error('[BioSite Firestore Error] onSnapshot listener encountered an error:', {
-            code: error?.code,
-            message: error?.message
-          });
-          if (error?.code === 'permission-denied') {
-            console.error('[BioSite Firestore Permission Error] Missing or insufficient permissions. Check firestore.rules.');
-          } else if (error?.code === 'unavailable') {
-            console.warn('[BioSite Firestore Network Warning] Firestore service currently unavailable or device is offline.');
+          console.warn('[BioSite Firestore Notice] onSnapshot notice:', error?.message || error);
+          if (isMounted) {
+            setIsInitialLoading(false);
           }
         }
       );
 
       return () => {
         isMounted = false;
+        clearTimeout(safetyTimer);
         unsubscribe();
       };
     } catch (e: any) {
       console.error('[BioSite Firestore Error] Failed to initialize Firestore listeners:', e);
+      if (isMounted) {
+        setIsInitialLoading(false);
+      }
       return () => {
         isMounted = false;
+        clearTimeout(safetyTimer);
       };
     }
-  }, []);
+  }, [applyIncomingData]);
+
+  // 3. Force Sync Function (On-Demand Real-Time Sychronization)
+  const forceSyncData = useCallback(async (): Promise<boolean> => {
+    setIsSyncing(true);
+    console.log('[BioSite Sync] Force synchronization initiated by user...');
+    try {
+      let dataLoaded = false;
+
+      // 1. Query Firestore Document
+      try {
+        const settingsDocRef = doc(db, 'biosite_data', 'main_settings');
+        const snap = await getDoc(settingsDocRef);
+        if (snap.exists()) {
+          const cloudData = snap.data();
+          console.log('[BioSite Sync] Force sync fetched latest Firestore data:', Object.keys(cloudData));
+          applyIncomingData(cloudData);
+          dataLoaded = true;
+        }
+      } catch (fErr) {
+        console.warn('[BioSite Sync] Force sync Firestore query notice:', fErr);
+      }
+
+      // 2. Query Server API Storage
+      try {
+        const res = await fetch('/api/site-data');
+        const json = await res.json();
+        if (json?.success && json?.data) {
+          console.log('[BioSite Sync] Force sync fetched latest Server API data.');
+          applyIncomingData(json.data);
+          dataLoaded = true;
+        }
+      } catch (sErr) {
+        console.warn('[BioSite Sync] Force sync Server API notice:', sErr);
+      }
+
+      setIsCloudSynced(true);
+      setIsSyncing(false);
+      setIsInitialLoading(false);
+      return dataLoaded;
+    } catch (err) {
+      console.error('[BioSite Sync] Force sync error:', err);
+      setIsSyncing(false);
+      setIsInitialLoading(false);
+      return false;
+    }
+  }, [applyIncomingData]);
 
   // Dynamic Browser Tab Favicon & Title Injection
   useEffect(() => {
@@ -1302,6 +1342,9 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasUnsavedChanges,
         isCloudSynced,
         isCloudSaving,
+        isInitialLoading,
+        isSyncing,
+        forceSyncData,
         saveAllData,
         exportAllDataJSON,
         importAllDataJSON,

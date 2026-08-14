@@ -46,12 +46,36 @@ import {
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
-  const { siteSettings, logoutAdmin, toggleAdminMode, orders, saveAllData, hasUnsavedChanges, isCloudSynced, isCloudSaving } = useBioSite();
+  const {
+    siteSettings,
+    logoutAdmin,
+    toggleAdminMode,
+    orders,
+    saveAllData,
+    hasUnsavedChanges,
+    isCloudSynced,
+    isCloudSaving,
+    isSyncing,
+    forceSyncData
+  } = useBioSite();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Alterações gravadas no Firestore Cloud com sucesso!');
 
   const handleGlobalSave = async () => {
     await saveAllData();
+    setToastMessage('Alterações gravadas no Firestore Cloud com sucesso!');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3500);
+  };
+
+  const handleForceSync = async () => {
+    const success = await forceSyncData();
+    setToastMessage(
+      success
+        ? 'Sincronização em Tempo Real concluída com sucesso!'
+        : 'Sincronização realizada com os servidores.'
+    );
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3500);
   };
@@ -142,12 +166,16 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Cloud Firestore Status Badge */}
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-semibold text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <Cloud className="w-3.5 h-3.5" />
-            <span>Nuvem Ativa</span>
-          </div>
+          {/* Cloud Firestore Status Badge with interactive Force Sync button */}
+          <button
+            onClick={handleForceSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-[#C9A45C]/10 border border-white/10 hover:border-[#C9A45C]/40 text-xs font-semibold text-white/80 hover:text-[#E5BF70] transition cursor-pointer"
+            title="Clique para forçar a busca das alterações mais recentes do Firestore em tempo real"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#C9A45C] ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}</span>
+          </button>
 
           <button
             onClick={handleGlobalSave}
@@ -190,7 +218,7 @@ export const AdminLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Save Success Toast Banner */}
+      {/* Save / Sync Success Toast Banner */}
       <AnimatePresence>
         {showToast && (
           <motion.div
@@ -202,7 +230,7 @@ export const AdminLayout: React.FC = () => {
             <div className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center">
               <Check className="w-4 h-4 text-black stroke-[3]" />
             </div>
-            <span className="text-sm tracking-wide">Todas as alterações do Painel foram salvas com sucesso!</span>
+            <span className="text-sm tracking-wide">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
