@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Portfolio images path structure: portfolio/{portfolioId}/{uniqueImageId}.webp
+    // Public read access so website visitors can view portfolio photos.
+    // Write, update, and delete access strictly restricted to authenticated administrators.
+    match /portfolio/{allPaths=**} {
+      allow read: if true;
+      allow write, create, update, delete: if request.auth != null;
+    }
+
+    // Default deny for all other storage paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
