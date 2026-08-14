@@ -1,0 +1,6 @@
+{
+  "name": "Continental Studio BioSite",
+  "description": "BioSite premium para venda de ensaios fotográficos com IA e painel administrativo completo",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
