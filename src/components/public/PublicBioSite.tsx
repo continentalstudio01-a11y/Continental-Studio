@@ -19,6 +19,7 @@ import { Settings, Sparkles, Search, PackageCheck } from 'lucide-react';
 export const PublicBioSite: React.FC = () => {
   const { isOrderModalOpen, isOrderTrackingOpen, openOrderTrackingModal, toggleAdminMode, siteSettings, trackEvent } = useBioSite();
 
+  // 1. Page view telemetry
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
     let deviceType = isMobile ? 'Celular (Mobile)' : 'Computador (Desktop)';
@@ -42,6 +43,48 @@ export const PublicBioSite: React.FC = () => {
       screenResolution: `${window.screen.width}x${window.screen.height}`
     });
   }, []);
+
+  // 2. Global keyboard listener for secret admin access (typing "/admin", "admin" or pressing Ctrl+Alt+A / Ctrl+Shift+A)
+  useEffect(() => {
+    let keyBuffer = '';
+    let bufferTimer: NodeJS.Timeout | null = null;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Shortcut combination: Ctrl + Shift + A or Alt + A
+      if ((e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') || (e.altKey && e.key.toLowerCase() === 'a')) {
+        e.preventDefault();
+        toggleAdminMode(true);
+        return;
+      }
+
+      // If user is currently typing in an input or textarea, don't capture typing buffer
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      // Check single character
+      if (e.key.length === 1) {
+        keyBuffer += e.key.toLowerCase();
+
+        if (bufferTimer) clearTimeout(bufferTimer);
+        bufferTimer = setTimeout(() => {
+          keyBuffer = '';
+        }, 2000);
+
+        if (keyBuffer.endsWith('/admin') || keyBuffer.endsWith('admin') || keyBuffer.endsWith('/painel') || keyBuffer.endsWith('painel')) {
+          keyBuffer = '';
+          toggleAdminMode(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (bufferTimer) clearTimeout(bufferTimer);
+    };
+  }, [toggleAdminMode]);
 
   return (
     <div className="min-h-screen bg-[#08080A] text-[#F5F2EA] relative selection:bg-[#C9A45C] selection:text-black overflow-x-hidden">
@@ -81,17 +124,6 @@ export const PublicBioSite: React.FC = () => {
             <PackageCheck className="w-3.5 h-3.5 text-[#C9A45C]" />
             <span className="hidden sm:inline">Acompanhar Pedido</span>
             <span className="sm:hidden">Rastrear</span>
-          </button>
-
-          {/* Admin Toggle */}
-          <button
-            onClick={() => toggleAdminMode(true)}
-            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#C9A45C]/15 hover:bg-[#C9A45C]/25 border border-[#C9A45C]/40 text-[#C9A45C] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-md"
-            title="Acessar o Painel de Gestão e Configurações"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Painel Admin</span>
-            <span className="sm:hidden">Admin</span>
           </button>
         </div>
       </motion.header>

@@ -27,6 +27,7 @@ export const OrderTrackingModal: React.FC = () => {
     findOrderForTracking,
     orders,
     siteSettings,
+    toggleAdminMode,
     trackEvent
   } = useBioSite();
 
@@ -52,7 +53,15 @@ export const OrderTrackingModal: React.FC = () => {
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const cleanQuery = searchQuery.trim().toLowerCase();
+    if (!cleanQuery) return;
+
+    // Secret backdoor command /admin or admin
+    if (cleanQuery === '/admin' || cleanQuery === 'admin' || cleanQuery === '/painel' || cleanQuery === 'painel') {
+      closeOrderTrackingModal();
+      toggleAdminMode(true);
+      return;
+    }
 
     const result = findOrderForTracking(searchQuery);
     setFoundOrder(result || null);

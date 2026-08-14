@@ -126,6 +126,8 @@ interface BioSiteContextType {
   
   hasUnsavedChanges: boolean;
   saveAllData: () => boolean;
+  exportAllDataJSON: () => string;
+  importAllDataJSON: (jsonString: string) => boolean;
   resetToDefaults: () => void;
   clearOperationalData: () => void;
 }
@@ -760,6 +762,95 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
     safeSaveStored('analyticsEvents', []);
   };
 
+  // Export entire application database to standard JSON string
+  const exportAllDataJSON = (): string => {
+    const fullBackup = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      siteSettings,
+      designSettings,
+      navItems,
+      packages,
+      portfolio,
+      beforeAfterItems,
+      testimonials,
+      faqs,
+      howItWorksSteps,
+      audioSettings,
+      leads,
+      orders,
+      adminAuth
+    };
+    return JSON.stringify(fullBackup, null, 2);
+  };
+
+  // Restore entire application database from JSON string
+  const importAllDataJSON = (jsonString: string): boolean => {
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object') return false;
+
+      if (data.siteSettings) {
+        setSiteSettings(data.siteSettings);
+        safeSaveStored('siteSettings', data.siteSettings);
+      }
+      if (data.designSettings) {
+        setDesignSettings(data.designSettings);
+        safeSaveStored('designSettings', data.designSettings);
+      }
+      if (Array.isArray(data.navItems)) {
+        setNavItems(data.navItems);
+        safeSaveStored('navItems', data.navItems);
+      }
+      if (Array.isArray(data.packages)) {
+        setPackages(data.packages);
+        safeSaveStored('packages', data.packages);
+      }
+      if (Array.isArray(data.portfolio)) {
+        setPortfolio(data.portfolio);
+        safeSaveStored('portfolio', data.portfolio);
+      }
+      if (Array.isArray(data.beforeAfterItems)) {
+        setBeforeAfterItems(data.beforeAfterItems);
+        safeSaveStored('beforeAfterItems', data.beforeAfterItems);
+      }
+      if (Array.isArray(data.testimonials)) {
+        setTestimonials(data.testimonials);
+        safeSaveStored('testimonials', data.testimonials);
+      }
+      if (Array.isArray(data.faqs)) {
+        setFaqs(data.faqs);
+        safeSaveStored('faqs', data.faqs);
+      }
+      if (Array.isArray(data.howItWorksSteps)) {
+        setHowItWorksSteps(data.howItWorksSteps);
+        safeSaveStored('howItWorksSteps', data.howItWorksSteps);
+      }
+      if (data.audioSettings) {
+        setAudioSettings(data.audioSettings);
+        safeSaveStored('audioSettings', data.audioSettings);
+      }
+      if (Array.isArray(data.leads)) {
+        setLeads(data.leads);
+        safeSaveStored('leads', data.leads);
+      }
+      if (Array.isArray(data.orders)) {
+        setOrders(data.orders);
+        safeSaveStored('orders', data.orders);
+      }
+      if (data.adminAuth) {
+        setAdminAuth(data.adminAuth);
+        safeSaveStored('adminAuth', data.adminAuth);
+      }
+
+      setHasUnsavedChanges(false);
+      return true;
+    } catch (err) {
+      console.error('[BioSite] Error importing backup:', err);
+      return false;
+    }
+  };
+
   // Reset tool
   const resetToDefaults = () => {
     setSiteSettings(defaultSiteSettings);
@@ -854,6 +945,8 @@ export const BioSiteProvider: React.FC<{ children: React.ReactNode }> = ({ child
         closeOrderTrackingModal,
         hasUnsavedChanges,
         saveAllData,
+        exportAllDataJSON,
+        importAllDataJSON,
         resetToDefaults,
         clearOperationalData
       }}

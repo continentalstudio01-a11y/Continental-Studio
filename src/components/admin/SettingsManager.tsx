@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useBioSite } from '../../context/BioSiteContext';
-import { Key, Database, RefreshCw, Download, Check, ShieldAlert, Trash2, Activity, Flame, Sparkles, Send } from 'lucide-react';
+import { Key, Database, RefreshCw, Download, Upload, Check, ShieldAlert, Trash2, Activity, Flame, Sparkles, Send, FileCheck } from 'lucide-react';
 import { fireMarketingEvent } from '../../lib/tracking';
 
 export const SettingsManager: React.FC = () => {
-  const { siteSettings, updateSiteSettings, updateAdminCredentials, resetToDefaults, clearOperationalData, trackEvent } = useBioSite();
+  const {
+    siteSettings,
+    updateSiteSettings,
+    updateAdminCredentials,
+    resetToDefaults,
+    clearOperationalData,
+    exportAllDataJSON,
+    importAllDataJSON,
+    trackEvent
+  } = useBioSite();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Admin Credentials
   const [adminEmail, setAdminEmail] = useState('continentalstudio01@gmail.com');
@@ -98,16 +110,40 @@ export const SettingsManager: React.FC = () => {
   };
 
   const handleExportJSON = () => {
-    const data = {
-      siteSettings,
-      exportedAt: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const jsonStr = exportAllDataJSON();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `continental_biosite_backup_${Date.now()}.json`;
+    a.download = `continental_biosite_backup_completo_${Date.now()}.json`;
     a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const success = importAllDataJSON(content);
+        if (success) {
+          setImportStatus('success');
+          setTimeout(() => setImportStatus('idle'), 4000);
+          alert('Backup restaurado com sucesso! Todas as suas configurações, pacotes e fotos foram recuperados.');
+        } else {
+          setImportStatus('error');
+          setTimeout(() => setImportStatus('idle'), 4000);
+          alert('Erro ao ler o arquivo de backup. Certifique-se de que é um arquivo JSON válido exportado pelo sistema.');
+        }
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -419,31 +455,61 @@ export const SettingsManager: React.FC = () => {
       {/* Backup and Restore */}
       <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4">
         <h3 className="text-base font-bold text-amber-400 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Backup e Restauração de Dados
+          <RefreshCw className="w-4 h-4" /> Backup Completo e Restauração de Dados
         </h3>
+        <p className="text-xs text-white/70 leading-relaxed">
+          Gere um arquivo de segurança com <strong>todas as suas fotos, pacotes, preços, botões, depoimentos e configurações</strong>. Você pode restaurar esse arquivo a qualquer momento em caso de atualização ou troca de dispositivo.
+        </p>
 
-        <div className="flex flex-wrap items-center gap-4">
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept=".json"
+          className="hidden"
+        />
+
+        <div className="flex flex-wrap items-center gap-3">
           <button
+            type="button"
             onClick={handleExportJSON}
-            className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 border border-white/15 cursor-pointer"
+            className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-2 border border-white/15 cursor-pointer shadow-md transition"
           >
-            <Download className="w-4 h-4" />
-            <span>Exportar Backup do Sistema (JSON)</span>
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Baixar Backup Completo (JSON)</span>
           </button>
 
           <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-5 py-3 rounded-xl bg-[#C9A45C]/15 hover:bg-[#C9A45C]/25 text-[#C9A45C] hover:text-white font-bold text-xs flex items-center gap-2 border border-[#C9A45C]/35 cursor-pointer shadow-md transition"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Restaurar Backup (Carregar Arquivo)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               if (confirm('Tem certeza que deseja restaurar as configurações originais de fábrica?')) {
                 resetToDefaults();
-                alert('Dados restaurados com sucesso!');
+                alert('Dados restaurados para o padrão com sucesso!');
               }
             }}
-            className="px-5 py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold text-xs flex items-center gap-2 border border-red-500/30 cursor-pointer"
+            className="px-5 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center gap-2 border border-red-500/20 cursor-pointer ml-auto"
           >
             <ShieldAlert className="w-4 h-4" />
-            <span>Restaurar Dados Originais de Fábrica</span>
+            <span>Restaurar Padrão de Fábrica</span>
           </button>
         </div>
+
+        {importStatus === 'success' && (
+          <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>Backup restaurado com sucesso! Todos os dados foram atualizados.</span>
+          </div>
+        )}
       </div>
     </div>
   );

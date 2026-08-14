@@ -67,17 +67,19 @@ export const Footer: React.FC = () => {
         <div className="w-16 h-0.5 bg-white/10 mx-auto mb-6" />
 
         {/* Admin Link & Copyright */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/40 max-w-xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/30 max-w-xl mx-auto">
           <span>
             © {new Date().getFullYear()} {siteSettings.brandName || 'Continental Studio'}. Todos os direitos reservados.
           </span>
 
+          {/* Discreet Admin Entrance */}
           <button
             onClick={() => toggleAdminMode(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C9A45C]/10 hover:bg-[#C9A45C]/20 border border-[#C9A45C]/30 text-[#C9A45C] hover:text-white transition cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-white/20 hover:text-[#C9A45C] hover:bg-white/5 border border-transparent hover:border-[#C9A45C]/20 transition-all text-[11px] cursor-pointer opacity-40 hover:opacity-100"
+            title="Acesso Administrativo"
           >
-            <Lock className="w-3.5 h-3.5 text-[#C9A45C]" />
-            <span className="font-semibold">Painel de Gestão (Admin)</span>
+            <Lock className="w-3 h-3 text-current" />
+            <span>Acesso Restrito</span>
           </button>
         </div>
       </div>
